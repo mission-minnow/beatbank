@@ -3,20 +3,20 @@
  *
  * Genre-first browsing of the (large) library:
  *   - jog turn         -> cycle patterns WITHIN the current genre
- *   - Knob 1 turn      -> switch genre (jumps to that genre's first pattern)
- *   - Knob 2 turn      -> swing (0..100)
- *   - Knobs 3-8 turn   -> change each voice's pad (drumrack) / note (gm), live
+ *   - Knobs 1-6 turn   -> change each voice's pad (drumrack) / note (gm), live
+ *   - Knob 7 turn      -> swing (0..100)
+ *   - Knob 8 turn      -> switch genre (jumps to that genre's first pattern)
  *   - jog click / Back -> exit (host closes the canvas; the pick is already set)
  *
  * Everything is on the jog + knobs — encoders the shadow chain UI owns. The
  * nav arrows (Move eats them for its sequencer) and Shift do NOT reach a
  * chain-preview canvas, so pad editing is POSITIONAL rather than banked:
- *   K3 edits the 1st voice row, K4 the 2nd, .. up to K8 (6th row).
+ *   K1 edits the 1st voice row, K2 the 2nd, .. up to K6 (6th row).
  * Voices appear in canonical order (kick, snare, ch, oh, then extras), so a
  * given voice keeps its pad across patterns even though which knob reaches it
- * depends on what the current pattern plays. Each row shows the drum-rack PAD
- * (pad = note - 35, notes 36..51) or raw note, plus the knob number that edits
- * it. Pad changes persist in the slot's state.
+ * depends on what the current pattern plays. Pads are the frequent edit, so
+ * they get K1-K6; swing/genre sit on K7/K8 (rarely touched once dialed in).
+ * Each row shows its knob number + the pad it drives; changes persist in state.
  */
 
 'use strict';
@@ -38,8 +38,9 @@ const VOICES = [
 const NUM_VOICES = VOICES.length;
 
 const CC_JOG = 14;
-const CC_KNOB1 = 71, CC_KNOB2 = 72;  /* K1=genre  K2=swing */
-const CC_KNOB3 = 73, CC_KNOB8 = 78;  /* K3..K8 = positional pad/note selectors */
+const CC_PAD_LO = 71, CC_PAD_HI = 76;  /* K1..K6 = positional pad/note selectors */
+const CC_SWING = 77;                    /* K7 = swing */
+const CC_GENRE = 78;                    /* K8 = genre */
 const SWING_STEP = 5;
 
 const g = {
@@ -169,9 +170,9 @@ function draw(ctx) {
 
   for (let r = 0; r < used.length; r++) {
     const v = used[r], row = g.rows[v], y = topY + r * pitch;
-    ctx.print(0, y, VOICES[v].label, 1);                     /* KCK  */
-    ctx.print(20, y, padLabel(g.note[v]), 1);                 /* p3   */
-    ctx.print(38, y, r < 6 ? 'K' + (r + 3) : '', 1);          /* K3.. positional */
+    ctx.print(0, y, r < 6 ? String(r + 1) : '', 1);          /* 1.. knob number */
+    ctx.print(10, y, VOICES[v].label, 1);                     /* KCK  */
+    ctx.print(30, y, padLabel(g.note[v]), 1);                 /* p3   */
     for (let s = 0; s < steps && s < row.length; s++) {
       const c = row[s];
       if (c === '.') continue;
@@ -185,7 +186,7 @@ function draw(ctx) {
     }
   }
 
-  ctx.print(0, 57, 'jog K1:gen K2:sw:' + g.swing, 1);
+  ctx.print(0, 57, 'K7 sw:' + g.swing + '  K8 genre', 1);
 }
 
 globalThis.canvas_overlay = {
@@ -199,10 +200,10 @@ globalThis.canvas_overlay = {
     if (type !== 0xB0 || b2 === 0) return;   /* encoders: 1..63 = +, 64..127 = - */
     const dir = b2 < 64 ? 1 : -1;
     if (b1 === CC_JOG)   { cyclePattern(ctx, dir); return; }
-    if (b1 === CC_KNOB1) { switchGenre(ctx, dir); return; }
-    if (b1 === CC_KNOB2) { setSwing(ctx, dir); return; }
-    if (b1 >= CC_KNOB3 && b1 <= CC_KNOB8) {
-      editNote(ctx, usedVoices()[b1 - CC_KNOB3], dir);   /* positional: K3 -> row 0 */
+    if (b1 === CC_GENRE) { switchGenre(ctx, dir); return; }
+    if (b1 === CC_SWING) { setSwing(ctx, dir); return; }
+    if (b1 >= CC_PAD_LO && b1 <= CC_PAD_HI) {
+      editNote(ctx, usedVoices()[b1 - CC_PAD_LO], dir);   /* positional: K1 -> row 0 */
       return;
     }
   },

@@ -66,16 +66,17 @@ Menu: **Pattern View** · **Globals** · **Swap / None**.
 
 - **Pattern** — a fullscreen grid view with **genre-first** browsing and live
   pad editing:
-  - **jog** cycles patterns *within the current genre*; **Knob 1** switches
-    genre; **Knob 2** sets swing (header shows `GENRE · name · pos/count`).
-  - **Knobs 3–8 re-point each drum voice to a different pad** (drum-rack) or
-    note (GM), live — no trip into the sampler. Knobs are **positional**: **K3**
-    edits the 1st row, **K4** the 2nd, … up to **K8** (6th). Rows are in fixed
-    order (kick, snare, hats, then extras), so a voice keeps its pad across
-    patterns — only *which* knob reaches it changes with what the pattern plays.
-  - Each voice row shows the note / **drum-rack pad number** (`p1`…`p16`) it
-    drives *and its knob* (`K3`…) — so you can match a loaded MrDrums kit
-    without leaving Beat Bank. Pad edits **persist with the slot** (switching
+  - **Knobs 1–6 re-point each drum voice to a different pad** (drum-rack) or
+    note (GM), live — no trip into the sampler. Positional: **K1** edits the
+    1st row, **K2** the 2nd, … up to **K6** (6th). Rows are in fixed order
+    (kick, snare, hats, then extras), so a voice keeps its pad across patterns —
+    only *which* knob reaches it changes with what the pattern plays.
+  - **jog** cycles patterns within the genre; **Knob 7** sets swing; **Knob 8**
+    switches genre (rarely needed once you've settled on one). Header shows
+    `GENRE · name · pos/count`.
+  - Each voice row shows its **knob number**, the voice, and the note /
+    **drum-rack pad** (`p1`…`p16`) it drives — so you can match a loaded MrDrums
+    kit without leaving Beat Bank. Pad edits **persist with the slot** (switching
     Note Map resets them).
   - **jog-click / Back** exits.
 - **Globals** — **Swing** (delays the off-beat 16ths; deterministic, works on
