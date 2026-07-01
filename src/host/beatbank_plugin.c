@@ -314,6 +314,19 @@ static void bb_set_param(void *instance, const char *key, const char *val)
         bi->swing = (uint8_t)clampi(json_field_int(val, "\"swing\"", bi->swing), 0, 100);
         /* Only override the map if the blob carries one; else keep the default. */
         if (strstr(val, "note_map")) apply_note_map(bi, strstr(val, "drumrack") != NULL);
+        /* Per-voice pad/note overrides (set in Pattern view) win over the map. */
+        {
+            const char *p = strstr(val, "\"notes\"");
+            if (p && (p = strchr(p, '[')) != NULL) {
+                p++;
+                for (int v = 0; v < BB_NUM_VOICES; v++) {
+                    while (*p == ' ' || *p == ',') p++;
+                    if (*p == ']' || *p == '\0') break;
+                    bi->note[v] = (uint8_t)clampi(atoi(p), 0, 127);
+                    while (*p && *p != ',' && *p != ']') p++;
+                }
+            }
+        }
         return;
     }
     for (int v = 0; v < BB_NUM_VOICES; v++)
@@ -346,9 +359,15 @@ static int bb_get_param(void *instance, const char *key, char *buf, int buf_len)
     if (strcmp(key, "preview_rev") == 0)   return snprintf(buf, buf_len, "%u", bi->preview_revision);
     if (strcmp(key, "note_map") == 0)      return snprintf(buf, buf_len, "%s", bi->note_map ? "drumrack" : "gm");
     if (strcmp(key, "swing") == 0)         return snprintf(buf, buf_len, "%u", bi->swing);
-    if (strcmp(key, "state") == 0)
-        return snprintf(buf, buf_len, "{\"pattern\":%d,\"swing\":%u,\"note_map\":\"%s\"}",
-                        bi->pattern, bi->swing, bi->note_map ? "drumrack" : "gm");
+    if (strcmp(key, "state") == 0) {
+        int off = snprintf(buf, buf_len,
+            "{\"pattern\":%d,\"swing\":%u,\"note_map\":\"%s\",\"notes\":[",
+            bi->pattern, bi->swing, bi->note_map ? "drumrack" : "gm");
+        for (int v = 0; v < BB_NUM_VOICES && off < buf_len; v++)
+            off += snprintf(buf + off, buf_len - off, "%s%u", v ? "," : "", bi->note[v]);
+        if (off < buf_len) off += snprintf(buf + off, buf_len - off, "]}");
+        return off;
+    }
 
     if (strcmp(key, "genre_list") == 0) {
         /* Bank is grouped by genre, so same-genre patterns are contiguous.
