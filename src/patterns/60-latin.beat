@@ -55,7 +55,6 @@ ride: x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.
 ch: ....x.......x.......x.......x...
 conga: ......A.......A.......A.......A.
 perc: AxxxAxxxAxxxAxxxAxxxAxxxAxxxAxxx
-snare: ..g...g...g...g...g...g...g...g.
 
 name: Bossa Full 2-3
 genre: BOSSA
@@ -145,7 +144,6 @@ rim: .x.x.xx.x.xx.x.x
 cowbell: x.x.x.x.x.x.x.x.
 conga: ..x...x...x...x.
 perc: AxxxAxxxAxxxAxxx
-tom: x.......x.......
 
 name: Surdo Marcacao
 genre: SAMBA
