@@ -3,14 +3,15 @@
 A library of **standard drum patterns** for [Schwung](https://github.com/charlesvestal/schwung) on Ableton Move.
 
 No generation, no randomness, no fills. Beat Bank is a chainable `midi_fx`
-that **prints** one of ~100 hand-authored, canonical drum grids straight into
-Move's step sequencer — so you can drop in a recognizable groove from almost
-any genre instead of programming one by hand.
+drum sequencer for Schwung's Signal Chain. It loops one of ~100 hand-authored,
+canonical drum grids and **plays the sound generator in the same slot** — e.g.
+an SF2 drum kit — using General MIDI drum notes. Same idea as
+[Super Arp](https://github.com/handcraftedcc/schwung-superarp): the module
+makes the notes, the chain feeds them to the synth.
 
-Pick a pattern from a list; it splats one bar into Move's clip (which Move
-records). That's the whole tool — no tempo, swing, preview, or note editing.
-It plays the grid straight at Move's tempo, so it never competes with Move's
-own groove.
+Stays entirely in the Schwung world — no Move-track mixing. Pick a pattern from
+a list; it loops at Move's tempo (silent when the transport is stopped).
+Record it the Schwung way with the Quantized Sampler (**Shift+Sample**).
 
 ## Patterns are editable files — add your own
 
@@ -49,49 +50,27 @@ electro, disco, UK garage · drum & bass, jungle, breakbeat, dubstep · funk
 (Funky Drummer, Cold Sweat, Purdie shuffle…), soul/Motown, rock/pop, gospel,
 country · bossa nova, samba, Latin, Afrobeat, reggae/dub, calypso.
 
-## Controls
+## Setup & use
 
-Dead simple. Beat Bank uses Schwung's standard chain menu (so it's fully
-swappable). Open the slot's **MIDI FX** and you get two entries:
+1. In a Schwung Signal Chain slot, load a **drum sound generator** — e.g. the
+   SF2 module with a GM/percussion kit — as the slot's Sound Generator.
+2. Load **Beat Bank** as that slot's **MIDI FX**.
+3. Open Beat Bank's menu → **Pattern** → scroll to a pattern. It loops whenever
+   Move's transport is playing; you hear it through the drum kit.
+4. **Record** with the Quantized Sampler (**Shift+Sample**) — it resamples the
+   chain's audio to a WAV in `Samples/Schwung/`.
 
-- **Pattern** — a scrolling list of the whole library (name + genre). **Land on
-  a pattern and it prints one bar into Move** (auto, after a brief settle).
-  Scroll to another to print a different one.
-- **Swap Module** — change Beat Bank for another MIDI FX, or pick **None** to
-  clear it.
-
-No preview, no note editing, no buttons — pick a pattern, it splats.
+Menu is just **Pattern** (the scrolling list, name + genre) and **Swap / None**.
+No tempo, swing, preview toggles, or note editing — it follows Move's tempo and
+plays straight.
 
 ## Voices
 
 Twelve voices, each sending a **General MIDI drum note** (Kick 36, Snare 38,
 Closed Hat 42, Open Hat 46, Clap 39, Rim/Clave 37, Tom 45, Ride 51, Crash 49,
-Cowbell 56, Conga 63, Perc 70). Use a **GM-mapped drum kit** on the Move track
-so they line up; if your kit maps pads differently, remap on the Move side.
-
-## Print into Move's native sequencer
-
-Beat Bank prints the selected pattern as one clean bar that Move records into a
-clip you own and can edit/switch natively.
-
-1. On **Move**: pick the drum track to fill, note its MIDI channel (track *N*
-   defaults to channel *N*). Its drum kit owns the 16 pads.
-2. In **Schwung**, on a shadow slot: set **MIDI FX = Beat Bank**, switch the
-   slot's **MIDI FX mode to Schw+Move**, set the slot's **Receive Channel** to
-   that track's channel, and **mute the slot** (a slot needs a sound generator
-   to be valid — load any; injection is on the MIDI path and keeps working).
-3. On **Move**: **arm Record** on that track and start playing.
-4. Open **Pattern**, scroll to the one you want — it prints one bar and Move
-   records it. Scroll to another to replace it.
-
-> Beat Bank can inject the notes but can't operate Move's transport, so **Move
-> must be playing + recording** to capture. Injected notes are the GM drum map;
-> Cowbell/Conga/Perc sit above the usual 36–51 pad range, so use a kit that maps
-> them or they won't sound.
->
-> The record-capture path was confirmed on hardware (Move records external
-> USB/injected MIDI into its step sequencer). The exact slot wiring (Schw+Move
-> + Receive Channel) should be sanity-checked on your device the first time.
+Cowbell 56, Conga 63, Perc 70). Use a **GM-mapped drum kit** so they line up.
+(Cowbell/Conga/Perc sit above the usual 36–51 range — pick a kit that maps
+them, or those voices won't sound.)
 
 ## Build & install
 

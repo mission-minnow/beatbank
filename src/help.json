@@ -8,44 +8,43 @@
         "patterns across many",
         "genres. No randomness.",
         "",
-        "Pick a pattern and it",
-        "prints one bar into",
-        "Move's step sequencer.",
-        "That's it."
+        "Beat Bank is a MIDI FX",
+        "drum sequencer. It",
+        "loops the pattern you",
+        "pick and plays the",
+        "sound generator in the",
+        "same slot (e.g. an SF2",
+        "drum kit), using GM",
+        "drum notes."
       ]
     },
     {
       "title": "How to use",
       "lines": [
-        "The menu has just:",
-        " - Pattern",
-        " - Swap Module / None",
+        "In a chain slot:",
+        " - Sound generator: a",
+        "   drum kit (SF2 with a",
+        "   GM/percussion kit).",
+        " - MIDI FX: Beat Bank.",
         "",
-        "Open Pattern -> a list.",
-        "Scroll to a pattern and",
-        "land on it: it splats",
-        "one bar into Move (name",
-        "+ genre shown).",
-        "",
-        "Scroll to another to",
-        "print a different one."
+        "Menu: Pattern + Swap.",
+        "Open Pattern -> a list;",
+        "scroll to pick one. It",
+        "loops when Move's",
+        "transport is playing."
       ]
     },
     {
-      "title": "Setup for printing",
+      "title": "Recording",
       "lines": [
-        "1 Slot MIDI FX mode ->",
-        "  Schw+Move; Receive",
-        "  Ch = the drum track.",
-        "  Mute the slot.",
-        "2 On Move: arm Record",
-        "  + start playing.",
-        "3 Pick a pattern -> it",
-        "  records into the",
-        "  current Move clip.",
+        "Record the Schwung way:",
+        "Shift+Sample (Quantized",
+        "Sampler) resamples the",
+        "chain's audio to a WAV",
+        "in Samples/Schwung/.",
         "",
-        "Move must be playing +",
-        "recording to capture."
+        "No Move-track mixing -",
+        "it stays in Schwung."
       ]
     },
     {

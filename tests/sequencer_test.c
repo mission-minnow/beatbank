@@ -1,11 +1,11 @@
 /*
- * sequencer_test.c — drive the Beat Bank plugin and verify note placement.
- * Loads a real .beat file via the bank loader (module_dir).
+ * sequencer_test.c — drive the Beat Bank plugin through MIDI clock and verify
+ * it loops the pattern and places notes correctly. Loads a real .beat file via
+ * the bank loader (module_dir).
  *
- * Beat Bank is a print tool: it emits only a one-shot bar, triggered either
- * explicitly (set_param "print") or by settling on a pattern (debounced
- * auto-splat). Note events are emitted from tick(), so we pump tick() after
- * each clock (as the chain does).
+ * Beat Bank emits its notes directly from process_midi (on the clock), which
+ * the chain feeds to the slot synth. Straight 16ths: a step every 6 clocks,
+ * step 0 firing 6 clocks after Start (0xFA).
  */
 
 #include "midi_fx_api_v1.h"
@@ -43,16 +43,17 @@ static void write_test_patterns(void)
     fclose(fp);
 }
 
-/* Assumes clock is running. Runs nclocks of 0xF8 (+ tick each), recording the
- * clock number of each note-on matching match_note (<0 = any). */
-static int run_clocks(midi_fx_api_v1_t *api, void *inst, int match, int *clk, int maxc, int nclocks)
+/* Send 0xFA (start), then nclocks of 0xF8; record the clock number of each
+ * note-on matching match_note (<0 = any) from process_midi's output. */
+static int run_bar(midi_fx_api_v1_t *api, void *inst, int match, int *clk, int maxc, int nclocks)
 {
     uint8_t out[MIDI_FX_MAX_OUT_MSGS][3];
     int lens[MIDI_FX_MAX_OUT_MSGS];
     uint8_t b; int count = 0;
+    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
     for (int c = 1; c <= nclocks; c++) {
-        b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-        int n = api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
+        b = 0xF8;
+        int n = api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
         for (int i = 0; i < n; i++)
             if ((out[i][0] & 0xF0) == 0x90 && out[i][2] > 0 && (match < 0 || out[i][1] == match)) {
                 if (count < maxc) clk[count] = c; count++; break;
@@ -74,48 +75,37 @@ int main(void)
     printf("Loaded %d patterns\n", count);
     CHECK(count >= 2, "loaded the two test patterns");
 
-    /* Isolate explicit print for the timing checks. */
-    api->set_param(inst, "auto_print", "0");
-    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
+    api->set_param(inst, "pattern", "0");     /* All Hits: every step fires */
 
-    printf("\nExplicit print = exactly one bar\n");
-    api->set_param(inst, "pattern", "0");     /* All Hits */
-    api->set_param(inst, "print", "1");
-    int n = run_clocks(api, inst, -1, clk, 64, 120);
-    CHECK(n == 16, "16 step-fires (one bar)");
-    CHECK(n >= 3 && clk[0] == 1 && clk[1] == 7 && clk[2] == 13, "steps at clocks 1,7,13...");
-    CHECK(n == 16 && clk[15] == 91, "last step at clock 91");
+    printf("\nStraight 16ths: a step every 6 clocks\n");
+    int ns = run_bar(api, inst, -1, clk, 64, 96);
+    CHECK(ns == 16, "16 step-fires in one bar");
+    CHECK(ns >= 3 && clk[0] == 6 && clk[1] == 12 && clk[2] == 18, "fires at clocks 6,12,18...");
+    CHECK(ns == 16 && clk[15] == 96, "bar ends at clock 96");
 
     printf("\nKick lands on the four beats\n");
-    api->set_param(inst, "print", "1");
-    int nk = run_clocks(api, inst, 36, clk, 64, 120);
-    CHECK(nk == 4 && clk[0] == 1 && clk[1] == 25 && clk[2] == 49 && clk[3] == 73,
-          "kick at clocks 1,25,49,73 (beats 1-4)");
+    int nk = run_bar(api, inst, 36, clk, 64, 96);
+    CHECK(nk == 4 && clk[0] == 6 && clk[1] == 30 && clk[2] == 54 && clk[3] == 78,
+          "kick at clocks 6,30,54,78");
+
+    printf("\nLoops continuously (two bars = 32 fires)\n");
+    int n2 = run_bar(api, inst, -1, clk, 64, 192);
+    CHECK(n2 == 32, "32 step-fires across two bars");
 
     printf("\nPattern switch -> snare backbeat\n");
-    api->set_param(inst, "pattern", "1");     /* Backbeat (auto_print off = no splat) */
-    api->set_param(inst, "print", "1");
-    int ns = run_clocks(api, inst, 38, clk, 64, 120);
-    CHECK(ns == 2 && clk[0] == 25 && clk[1] == 73, "snare at clocks 25,73 (beats 2 & 4)");
+    api->set_param(inst, "pattern", "1");
+    int nsn = run_bar(api, inst, 38, clk, 64, 96);
+    CHECK(nsn == 2 && clk[0] == 30 && clk[1] == 78, "snare at clocks 30,78 (beats 2 & 4)");
 
     printf("\nStop flushes held notes\n");
-    api->set_param(inst, "print", "1");
-    run_clocks(api, inst, -1, clk, 64, 2);    /* fire step 0 (a note is held) */
-    b = 0xFC; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    int fn = api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
+    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
+    for (int c = 1; c <= 6; c++) { b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS); } /* step 0 fires */
+    b = 0xFC;
+    int fn = api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
     int offs = 0;
     for (int i = 0; i < fn; i++)
         if ((out[i][0] & 0xF0) == 0x80 || (out[i][2] == 0)) offs++;
     CHECK(offs >= 1, "stop emits note-off(s)");
-
-    printf("\nSelecting a pattern auto-splats one bar\n");
-    api->set_param(inst, "auto_print", "1");
-    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    api->set_param(inst, "pattern", "0");     /* change 1 -> 0 arms the debounce */
-    int nd = run_clocks(api, inst, -1, clk, 64, 160);  /* debounce (~50) then one bar */
-    CHECK(nd == 16, "auto-splat fires exactly one bar after settling");
 
     api->destroy_instance(inst);
     if (failures) { printf("\nFAIL: %d check(s) failed\n", failures); return 1; }

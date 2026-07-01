@@ -3,16 +3,16 @@
  *
  * API: midi_fx_api_v1_t  (entry point: move_midi_fx_init)
  *
- * Bare-bones print tool. It plays nothing continuously. You browse the pattern
- * list (native Schwung menu); when you LAND on a pattern it "splats" one clean
- * bar into Move — i.e. it injects exactly one bar which Move records into the
- * armed track's clip. No loop, no preview, no note editing.
+ * A chainable MIDI FX drum sequencer, in the Schwung world only. It loops the
+ * selected pattern on Move's clock and emits General MIDI drum notes into the
+ * chain, which drives whatever sound generator sits in the slot (e.g. an SF2
+ * drum kit). Same semantic as Super Arp: the module makes notes, the chain
+ * feeds them to the synth. Record with Schwung's Quantized Sampler.
  *
- * Patterns load from external .beat files (see patterns.c). NO randomness.
+ * NO randomness. Patterns load from external .beat files (see patterns.c).
+ * It plays straight at Move's tempo — silent unless the transport is running.
  *
- * Selecting a pattern arms a short debounce; when it expires (you've settled on
- * one) it fires one bar. The bar itself steps on Move's MIDI clock (6 clocks
- * per 16th), so Move must be playing + recording to capture it.
+ *   0xFA reset to step 0 · 0xF8 advance (6 clocks / 16th), looping · 0xFC stop.
  */
 
 #include "midi_fx_api_v1.h"
@@ -27,21 +27,15 @@
 #define MIDI_NOTE_OFF  0x80u
 
 #define CLOCKS_PER_STEP 6u   /* 24 PPQN / 4 sixteenths */
-#define GATE_CLOCKS     2u   /* note length in clocks (< one step) */
+#define GATE_CLOCKS     3u   /* note length in clocks (< one step) */
 #define OUT_CHANNEL     0u   /* the chain/slot rewrites the channel on output */
 
-#define OUTQ_SIZE       128u
-#define PRINT_DEBOUNCE_TICKS 50   /* ~145 ms of "settled on a pattern" */
-
 static char g_note_keys[BB_NUM_VOICES][16];
-
 static const host_api_v1_t *g_host = NULL;
 
 /* The pattern bank is read-only and shared across all instances. */
 static BeatBank g_bank = { NULL, 0 };
 static int      g_bank_loaded = 0;
-
-typedef struct { uint8_t status, d1, d2; } OutEvent;
 
 typedef struct {
     uint8_t active;
@@ -50,37 +44,16 @@ typedef struct {
 } PendingNoteOff;
 
 typedef struct {
-    int     pattern;                 /* selected index into the bank        */
-    uint8_t note[BB_NUM_VOICES];     /* output note per voice (GM defaults)  */
+    int     pattern;                 /* selected index into the bank         */
+    uint8_t note[BB_NUM_VOICES];     /* GM output note per voice             */
 
     uint8_t cur_step;
     uint8_t clock_running;           /* Move transport running               */
     uint8_t midi_clocks_until_tick;
 
-    int     print_remaining;         /* >0 while a one-shot bar is playing   */
-    int     print_debounce;          /* >0: counting down to auto-splat      */
-    uint8_t auto_print;              /* 1 = selecting a pattern auto-splats   */
-
     uint32_t preview_revision;
-
     PendingNoteOff pending[BB_NUM_VOICES];
-    OutEvent outq[OUTQ_SIZE];
-    unsigned outq_head, outq_tail;
 } BeatBankInstance;
-
-/* ── Emit queue ──────────────────────────────────────────────────────────── */
-
-static void q_push(BeatBankInstance *bi, uint8_t status, uint8_t d1, uint8_t d2)
-{
-    unsigned next = (bi->outq_tail + 1u) % OUTQ_SIZE;
-    if (next == bi->outq_head) return;
-    bi->outq[bi->outq_tail].status = status;
-    bi->outq[bi->outq_tail].d1 = d1;
-    bi->outq[bi->outq_tail].d2 = d2;
-    bi->outq_tail = next;
-}
-static void q_note_on(BeatBankInstance *bi, uint8_t note, uint8_t vel)  { q_push(bi, (uint8_t)(MIDI_NOTE_ON  | OUT_CHANNEL), note, vel); }
-static void q_note_off(BeatBankInstance *bi, uint8_t note)             { q_push(bi, (uint8_t)(MIDI_NOTE_OFF | OUT_CHANNEL), note, 0); }
 
 /* ── Bank helpers ────────────────────────────────────────────────────────── */
 
@@ -98,61 +71,72 @@ static uint8_t pattern_steps(const BeatBankInstance *bi)
     return p->steps > BB_MAX_STEPS ? BB_MAX_STEPS : p->steps;
 }
 
-/* ── Sequencing ──────────────────────────────────────────────────────────── */
+/* ── MIDI emit (direct into the chain's out buffer) ──────────────────────── */
 
-static void flush_all(BeatBankInstance *bi)
+static int emit(uint8_t status, uint8_t note, uint8_t vel,
+                uint8_t out_msgs[][3], int out_lens[], int max_out, int count)
+{
+    if (count >= max_out) return count;
+    out_msgs[count][0] = status; out_msgs[count][1] = note; out_msgs[count][2] = vel;
+    out_lens[count] = 3;
+    return count + 1;
+}
+
+static int flush_all(BeatBankInstance *bi, uint8_t out_msgs[][3], int out_lens[], int max_out, int count)
 {
     for (int v = 0; v < BB_NUM_VOICES; v++) {
         if (bi->pending[v].active) {
-            q_note_off(bi, bi->pending[v].note);
-            bi->pending[v].active = 0;
-            bi->pending[v].clocks_left = 0;
+            count = emit((uint8_t)(MIDI_NOTE_OFF | OUT_CHANNEL), bi->pending[v].note, 0, out_msgs, out_lens, max_out, count);
+            bi->pending[v].active = 0; bi->pending[v].clocks_left = 0;
+            if (count >= max_out) break;
         }
     }
+    return count;
 }
 
-static void advance_pending_clocks(BeatBankInstance *bi)
+static int advance_pending_clocks(BeatBankInstance *bi, uint8_t out_msgs[][3], int out_lens[], int max_out, int count)
 {
     for (int v = 0; v < BB_NUM_VOICES; v++) {
         PendingNoteOff *p = &bi->pending[v];
         if (!p->active) continue;
         if (p->clocks_left > 0) p->clocks_left--;
-        if (p->clocks_left == 0) { q_note_off(bi, p->note); p->active = 0; }
+        if (p->clocks_left == 0) {
+            count = emit((uint8_t)(MIDI_NOTE_OFF | OUT_CHANNEL), p->note, 0, out_msgs, out_lens, max_out, count);
+            p->active = 0;
+            if (count >= max_out) break;
+        }
     }
+    return count;
 }
 
-static void fire_step(BeatBankInstance *bi)
+static int fire_step(BeatBankInstance *bi, uint8_t out_msgs[][3], int out_lens[], int max_out, int count)
 {
     const BeatPattern *p = pattern_at(bi->pattern);
     uint8_t steps = pattern_steps(bi);
     uint8_t step = bi->cur_step;
 
-    if (!p) return;
+    if (!p) return count;
     if (step >= steps) step = 0;
 
     for (int v = 0; v < BB_NUM_VOICES; v++) {
         const char *row = p->rows[v];
         PendingNoteOff *pn = &bi->pending[v];
         uint8_t vel;
-        if (pn->active) { q_note_off(bi, pn->note); pn->active = 0; }
+        if (pn->active) {
+            count = emit((uint8_t)(MIDI_NOTE_OFF | OUT_CHANNEL), pn->note, 0, out_msgs, out_lens, max_out, count);
+            pn->active = 0;
+            if (count >= max_out) return count;
+        }
         if (!row[0]) continue;
         if (step >= (uint8_t)strlen(row)) continue;
         vel = bb_char_velocity(row[step]);
         if (vel == 0) continue;
-        q_note_on(bi, bi->note[v], vel);
+        count = emit((uint8_t)(MIDI_NOTE_ON | OUT_CHANNEL), bi->note[v], vel, out_msgs, out_lens, max_out, count);
+        if (count >= max_out) return count;
         pn->active = 1; pn->note = bi->note[v]; pn->clocks_left = GATE_CLOCKS;
     }
     bi->cur_step = (uint8_t)((step + 1) % steps);
-}
-
-/* Start a one-shot bar of the current pattern. */
-static void trigger_print(BeatBankInstance *bi)
-{
-    flush_all(bi);
-    bi->cur_step = 0;
-    bi->midi_clocks_until_tick = 1;   /* fire step 0 on the next clock */
-    bi->print_remaining = pattern_steps(bi);
-    bi->print_debounce = 0;
+    return count;
 }
 
 /* ── Lifecycle ───────────────────────────────────────────────────────────── */
@@ -177,50 +161,56 @@ static void *bb_create_instance(const char *module_dir, const char *config_json)
     bi->cur_step = 0;
     bi->clock_running = 0;
     bi->midi_clocks_until_tick = CLOCKS_PER_STEP;
-    bi->print_remaining = 0;
-    bi->print_debounce = 0;
-    bi->auto_print = 1;
     bi->preview_revision = 1;
-    bi->outq_head = bi->outq_tail = 0;
     return bi;
 }
 
 static void bb_destroy_instance(void *instance) { free(instance); }
 
-/* ── MIDI clock processing ───────────────────────────────────────────────── */
+/* ── MIDI clock processing (loops the pattern, drives the slot synth) ─────── */
 
 static int bb_process_midi(void *instance, const uint8_t *in_msg, int in_len,
                            uint8_t out_msgs[][3], int out_lens[], int max_out)
 {
     BeatBankInstance *bi = (BeatBankInstance *)instance;
-    (void)out_msgs; (void)out_lens; (void)max_out;
     if (!bi || in_len == 0) return 0;
 
-    if (in_msg[0] == 0xFAu || in_msg[0] == 0xFBu) {       /* Start / Continue */
+    if (in_msg[0] == 0xFAu) {                     /* Start */
+        int count = flush_all(bi, out_msgs, out_lens, max_out, 0);
+        bi->cur_step = 0;
+        bi->midi_clocks_until_tick = CLOCKS_PER_STEP;
         bi->clock_running = 1;
-    } else if (in_msg[0] == 0xF8u) {                      /* Clock tick */
+        return count;
+    }
+    if (in_msg[0] == 0xFBu) {                      /* Continue */
+        bi->clock_running = 1;
+        return 0;
+    }
+    if (in_msg[0] == 0xF8u) {                      /* Clock tick */
+        int count = 0;
         if (!bi->clock_running) return 0;
-        advance_pending_clocks(bi);
+        count = advance_pending_clocks(bi, out_msgs, out_lens, max_out, count);
+        if (count >= max_out) return count;
         if (bi->midi_clocks_until_tick > 0) bi->midi_clocks_until_tick--;
         if (bi->midi_clocks_until_tick == 0) {
-            if (bi->print_remaining > 0) { fire_step(bi); bi->print_remaining--; }
+            count = fire_step(bi, out_msgs, out_lens, max_out, count);   /* loops */
             bi->midi_clocks_until_tick = CLOCKS_PER_STEP;
         }
-    } else if (in_msg[0] == 0xFCu) {                      /* Stop */
-        bi->clock_running = 0;
-        bi->print_remaining = 0;
-        flush_all(bi);
+        return count;
     }
-    return 0;   /* all output is emitted from tick() */
+    if (in_msg[0] == 0xFCu) {                      /* Stop */
+        bi->clock_running = 0;
+        return flush_all(bi, out_msgs, out_lens, max_out, 0);
+    }
+    return 0;
 }
 
-/* ── Tick: debounce auto-splat + drain queue ─────────────────────────────── */
+/* ── Tick: stop cleanly if the clock goes away without a 0xFC ────────────── */
 
 static int bb_tick(void *instance, int frames, int sample_rate,
                    uint8_t out_msgs[][3], int out_lens[], int max_out)
 {
     BeatBankInstance *bi = (BeatBankInstance *)instance;
-    int count = 0;
     (void)frames; (void)sample_rate;
     if (!bi) return 0;
 
@@ -229,24 +219,10 @@ static int bb_tick(void *instance, int frames, int sample_rate,
         if ((status == MOVE_CLOCK_STATUS_STOPPED ||
              status == MOVE_CLOCK_STATUS_UNAVAILABLE) && bi->clock_running) {
             bi->clock_running = 0;
-            bi->print_remaining = 0;
-            flush_all(bi);
+            return flush_all(bi, out_msgs, out_lens, max_out, 0);
         }
     }
-
-    if (bi->print_debounce > 0) {
-        bi->print_debounce--;
-        if (bi->print_debounce == 0) trigger_print(bi);
-    }
-
-    while (bi->outq_head != bi->outq_tail && count < max_out) {
-        OutEvent *e = &bi->outq[bi->outq_head];
-        out_msgs[count][0] = e->status; out_msgs[count][1] = e->d1; out_msgs[count][2] = e->d2;
-        out_lens[count] = 3;
-        count++;
-        bi->outq_head = (bi->outq_head + 1u) % OUTQ_SIZE;
-    }
-    return count;
+    return 0;
 }
 
 /* ── Parameter I/O ───────────────────────────────────────────────────────── */
@@ -273,21 +249,25 @@ static void bb_set_param(void *instance, const char *key, const char *val)
             bi->pattern = idx;
             if (bi->cur_step >= pattern_steps(bi)) bi->cur_step = 0;
             bi->preview_revision++;
-            if (bi->auto_print) bi->print_debounce = PRINT_DEBOUNCE_TICKS; /* land -> splat */
         }
         return;
     }
-    if (strcmp(key, "print") == 0)      { trigger_print(bi); return; }
-    if (strcmp(key, "auto_print") == 0) { bi->auto_print = (uint8_t)(parse_int(val, 0, 1, 1) != 0); return; }
-
     for (int v = 0; v < BB_NUM_VOICES; v++)
         if (strcmp(key, g_note_keys[v]) == 0) { bi->note[v] = (uint8_t)parse_int(val, 0, 127, bb_default_notes[v]); return; }
+}
+
+static int indexed_key(const char *key, const char *prefix)
+{
+    size_t pl = strlen(prefix);
+    if (strncmp(key, prefix, pl) != 0 || key[pl] != '@') return -1;
+    return atoi(key + pl + 1);
 }
 
 static int bb_get_param(void *instance, const char *key, char *buf, int buf_len)
 {
     BeatBankInstance *bi = (BeatBankInstance *)instance;
     const BeatPattern *p;
+    int gi;
     if (!bi || !key || !buf || buf_len <= 0) return -1;
     p = pattern_at(bi->pattern);
 
@@ -297,8 +277,14 @@ static int bb_get_param(void *instance, const char *key, char *buf, int buf_len)
     if (strcmp(key, "pattern_label") == 0) return snprintf(buf, buf_len, "%s  %s", p ? p->name : "", p ? p->genre : "");
     if (strcmp(key, "pattern_genre") == 0) return snprintf(buf, buf_len, "%s", p ? p->genre : "");
     if (strcmp(key, "steps") == 0)         return snprintf(buf, buf_len, "%u", pattern_steps(bi));
-    if (strcmp(key, "printing") == 0)      return snprintf(buf, buf_len, "%d", bi->print_remaining > 0 ? 1 : 0);
+    if (strcmp(key, "play_step") == 0)     return snprintf(buf, buf_len, "%u", bi->cur_step);
+    if (strcmp(key, "playing") == 0)       return snprintf(buf, buf_len, "%u", bi->clock_running);
     if (strcmp(key, "preview_rev") == 0)   return snprintf(buf, buf_len, "%u", bi->preview_revision);
+
+    gi = indexed_key(key, "name");
+    if (gi >= 0) { const BeatPattern *q = pattern_at(gi); return snprintf(buf, buf_len, "%s", q ? q->name : ""); }
+    gi = indexed_key(key, "genre");
+    if (gi >= 0) { const BeatPattern *q = pattern_at(gi); return snprintf(buf, buf_len, "%s", q ? q->genre : ""); }
 
     if (strncmp(key, "row", 3) == 0) {
         int v = atoi(key + 3);
