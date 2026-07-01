@@ -92,6 +92,15 @@ int main(void)
     int n2 = run_bar(api, inst, -1, clk, 64, 192);
     CHECK(n2 == 32, "32 step-fires across two bars");
 
+    printf("\nSwing delays the off-beat 16ths\n");
+    api->set_param(inst, "swing", "100");
+    int sw = run_bar(api, inst, -1, clk, 64, 96);
+    CHECK(sw == 16, "swing keeps 16 fires");
+    CHECK(sw >= 4 && clk[0] == 4 && clk[1] == 12 && clk[2] == 16 && clk[3] == 24,
+          "swung off-beats late (clocks 4,12,16,24)");
+    CHECK(sw == 16 && clk[15] == 96, "swung bar still ends at clock 96");
+    api->set_param(inst, "swing", "0");
+
     printf("\nPattern switch -> snare backbeat\n");
     api->set_param(inst, "pattern", "1");
     int nsn = run_bar(api, inst, 38, clk, 64, 96);

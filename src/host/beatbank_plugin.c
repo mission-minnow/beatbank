@@ -55,6 +55,7 @@ typedef struct {
     int     pattern;                 /* selected index into the bank         */
     uint8_t note[BB_NUM_VOICES];     /* output note per voice                */
     uint8_t note_map;                /* 0 = gm, 1 = drumrack (36..51)         */
+    uint8_t swing;                   /* 0..100, delays off-beat 16ths         */
 
     uint8_t cur_step;
     uint8_t clock_running;           /* Move transport running               */
@@ -78,6 +79,20 @@ static uint8_t pattern_steps(const BeatBankInstance *bi)
     const BeatPattern *p = pattern_at(bi->pattern);
     if (!p || p->steps < 1) return 16u;
     return p->steps > BB_MAX_STEPS ? BB_MAX_STEPS : p->steps;
+}
+
+/* Swing: 0..100 maps to 0..2 clocks of delay on the off-beat 16ths. Move's
+ * clock is 6 clocks / 16th, so +1 ≈ 58% swing, +2 ≈ 66%. Off-beats (odd step
+ * index) fire late, on-beats early, so each pair keeps its 12-clock span. */
+static uint8_t swing_clocks(const BeatBankInstance *bi)
+{
+    return (uint8_t)((bi->swing * 2u + 50u) / 100u);
+}
+static uint8_t clocks_before_step(const BeatBankInstance *bi, uint8_t step)
+{
+    uint8_t sc = swing_clocks(bi);
+    if (step & 1u) return (uint8_t)(CLOCKS_PER_STEP + sc);
+    return (uint8_t)(CLOCKS_PER_STEP > sc ? CLOCKS_PER_STEP - sc : 1u);
 }
 
 /* ── MIDI emit (direct into the chain's out buffer) ──────────────────────── */
@@ -188,7 +203,7 @@ static int bb_process_midi(void *instance, const uint8_t *in_msg, int in_len,
     if (in_msg[0] == 0xFAu) {                     /* Start */
         int count = flush_all(bi, out_msgs, out_lens, max_out, 0);
         bi->cur_step = 0;
-        bi->midi_clocks_until_tick = CLOCKS_PER_STEP;
+        bi->midi_clocks_until_tick = clocks_before_step(bi, 0);
         bi->clock_running = 1;
         return count;
     }
@@ -204,7 +219,7 @@ static int bb_process_midi(void *instance, const uint8_t *in_msg, int in_len,
         if (bi->midi_clocks_until_tick > 0) bi->midi_clocks_until_tick--;
         if (bi->midi_clocks_until_tick == 0) {
             count = fire_step(bi, out_msgs, out_lens, max_out, count);   /* loops */
-            bi->midi_clocks_until_tick = CLOCKS_PER_STEP;
+            bi->midi_clocks_until_tick = clocks_before_step(bi, bi->cur_step);
         }
         return count;
     }
@@ -262,6 +277,7 @@ static void bb_set_param(void *instance, const char *key, const char *val)
         }
         return;
     }
+    if (strcmp(key, "swing") == 0) { bi->swing = (uint8_t)parse_int(val, 0, 100, 0); return; }
     if (strcmp(key, "note_map") == 0) {
         int m;
         if (strcmp(val, "gm") == 0)            m = 0;
@@ -301,6 +317,7 @@ static int bb_get_param(void *instance, const char *key, char *buf, int buf_len)
     if (strcmp(key, "playing") == 0)       return snprintf(buf, buf_len, "%u", bi->clock_running);
     if (strcmp(key, "preview_rev") == 0)   return snprintf(buf, buf_len, "%u", bi->preview_revision);
     if (strcmp(key, "note_map") == 0)      return snprintf(buf, buf_len, "%s", bi->note_map ? "drumrack" : "gm");
+    if (strcmp(key, "swing") == 0)         return snprintf(buf, buf_len, "%u", bi->swing);
 
     gi = indexed_key(key, "name");
     if (gi >= 0) { const BeatPattern *q = pattern_at(gi); return snprintf(buf, buf_len, "%s", q ? q->name : ""); }

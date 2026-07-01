@@ -60,9 +60,17 @@ country · bossa nova, samba, Latin, Afrobeat, reggae/dub, calypso.
 4. **Record** with the Quantized Sampler (**Shift+Sample**) — it resamples the
    chain's audio to a WAV in `Samples/Schwung/`.
 
-Menu is just **Pattern** (the scrolling list, name + genre) and **Swap / None**.
-No tempo, swing, preview toggles, or note editing — it follows Move's tempo and
-plays straight.
+Menu: **Pattern View** · **Globals** · **Swap / None**.
+
+- **Pattern View** — a fullscreen grid: **jog** browses/selects the beat;
+  **jog-click / Back** exits. Each voice row shows the note *and the drum-rack
+  pad number* it drives (`p1`…`p16`), so you can see which pad to swap in your
+  sampler (e.g. MrDrums) to change a sound.
+- **Globals** — **Swing** (delays the off-beat 16ths; deterministic, works on
+  any synth — Move's Groove doesn't apply since we bypass its sequencer) and
+  **Note Map** (below).
+
+It follows Move's tempo and plays straight; swing is the only groove control.
 
 ## Voices & Note Map
 

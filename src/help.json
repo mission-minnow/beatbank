@@ -23,15 +23,24 @@
       "lines": [
         "In a chain slot:",
         " - Sound generator: a",
-        "   drum kit (SF2 with a",
-        "   GM/percussion kit).",
+        "   drum kit (SF2, or a",
+        "   sampler like MrDrums",
+        "   with a preset kit).",
         " - MIDI FX: Beat Bank.",
         "",
-        "Menu: Pattern + Swap.",
-        "Open Pattern -> a list;",
-        "scroll to pick one. It",
-        "loops when Move's",
-        "transport is playing."
+        "Menu: Pattern View,",
+        "Globals, Swap.",
+        "",
+        "Pattern View: jog to",
+        "browse/pick a beat; it",
+        "shows the grid and the",
+        "note/pad each drum",
+        "drives. Click or Back",
+        "exits. It loops when",
+        "Move is playing.",
+        "",
+        "Globals: Swing + Note",
+        "Map."
       ]
     },
     {
