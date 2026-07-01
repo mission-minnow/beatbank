@@ -6,20 +6,17 @@
  *   - Knob 1 turn      -> switch genre (jumps to that genre's first pattern)
  *   - Knob 2 turn      -> swing (0..100)
  *   - Knobs 3-8 turn   -> change each voice's pad (drumrack) / note (gm), live
- *   - Shift + Knobs    -> second bank for the extra voices (busy patterns)
  *   - jog click / Back -> exit (host closes the canvas; the pick is already set)
  *
- * Everything is on the jog + knobs (encoders the shadow chain UI owns) and
- * Shift (CC 49, also forwarded to the overlay) — NOT the nav arrows, which
- * Move's firmware consumes for its own sequencer before a chain-preview canvas
- * ever sees them.
- *
- * Knob -> voice map (per pattern; only voices the pattern plays are editable):
- *   K3=Kick K4=Snare K5=CH K6=OH   (the fixed main 4)
- *   K7,K8   = 1st & 2nd extra voice
- *   Shift+K3,K4,K5.. = extra voices 3,4,5.. (row tag shows "s3","s4",..)
- * Each row shows the drum-rack PAD (pad = note - 35, notes 36..51) or raw note,
- * plus the knob tag that edits it. Pad changes persist in the slot's state.
+ * Everything is on the jog + knobs — encoders the shadow chain UI owns. The
+ * nav arrows (Move eats them for its sequencer) and Shift do NOT reach a
+ * chain-preview canvas, so pad editing is POSITIONAL rather than banked:
+ *   K3 edits the 1st voice row, K4 the 2nd, .. up to K8 (6th row).
+ * Voices appear in canonical order (kick, snare, ch, oh, then extras), so a
+ * given voice keeps its pad across patterns even though which knob reaches it
+ * depends on what the current pattern plays. Each row shows the drum-rack PAD
+ * (pad = note - 35, notes 36..51) or raw note, plus the knob number that edits
+ * it. Pad changes persist in the slot's state.
  */
 
 'use strict';
@@ -39,16 +36,15 @@ const VOICES = [
   { label: 'PRC', key: 'perc_note' },
 ];
 const NUM_VOICES = VOICES.length;
-const MAIN = [0, 1, 2, 3];          /* kick, snare, ch, oh — always on K3..K6 */
 
-const CC_JOG = 14, CC_SHIFT = 49;
+const CC_JOG = 14;
 const CC_KNOB1 = 71, CC_KNOB2 = 72;  /* K1=genre  K2=swing */
-const CC_KNOB3 = 73, CC_KNOB8 = 78;  /* K3..K8 = pad/note selectors */
+const CC_KNOB3 = 73, CC_KNOB8 = 78;  /* K3..K8 = positional pad/note selectors */
 const SWING_STEP = 5;
 
 const g = {
   count: 1, pattern: 0, steps: 16, name: '', genre: '', swing: 0,
-  drumrack: true, shift: false,
+  drumrack: true,
   rows: new Array(NUM_VOICES).fill(''),
   note: new Array(NUM_VOICES).fill(0),
   genres: [],   /* [{name, start, count}] */
@@ -100,38 +96,18 @@ function load(ctx, force) {
   for (let v = 0; v < NUM_VOICES; v++) g.note[v] = gpi(ctx, VOICES[v].key, g.note[v]);
 }
 
-/* Non-main voices the current pattern actually plays, in canonical order. */
-function presentExtras() {
+/* Voices the current pattern plays, in canonical order = the display rows.
+ * Knobs are POSITIONAL: K3 edits row 0, K4 row 1, .. K8 row 5. A voice keeps
+ * its pad across patterns (notes are per-instance) even though the knob that
+ * reaches it depends on what the current pattern plays. */
+function usedVoices() {
   const out = [];
-  for (let v = 4; v < NUM_VOICES; v++) if (g.rows[v] && g.rows[v].length) out.push(v);
+  for (let v = 0; v < NUM_VOICES; v++) if (g.rows[v] && g.rows[v].length) out.push(v);
   return out;
 }
 
-/* Physical knob (3..8) + shift -> voice index, or -1 if that knob is unused. */
-function knobVoice(knob, shift) {
-  if (!shift) {
-    if (knob >= 3 && knob <= 6) return MAIN[knob - 3];
-    const ex = presentExtras();
-    return ex[knob - 7] === undefined ? -1 : ex[knob - 7];   /* K7,K8 -> extra 0,1 */
-  }
-  const ex = presentExtras();
-  const idx = (knob - 3) + 2;                                 /* Shift+K3 -> extra 2 */
-  return ex[idx] === undefined ? -1 : ex[idx];
-}
-
-/* Reverse: knob tag shown on a voice's row ("3".."8", or "s3".. under Shift). */
-function knobTag(voice) {
-  const m = MAIN.indexOf(voice);
-  if (m >= 0) return String(m + 3);
-  const ei = presentExtras().indexOf(voice);
-  if (ei === 0) return '7';
-  if (ei === 1) return '8';
-  if (ei >= 2 && ei <= 7) return 's' + ((ei - 2) + 3);
-  return '';
-}
-
 function editNote(ctx, voice, dir) {
-  if (voice < 0) return;
+  if (voice === undefined || voice < 0) return;
   const lo = g.drumrack ? 36 : 0, hi = g.drumrack ? 51 : 127;
   const n = Math.max(lo, Math.min(hi, g.note[voice] + dir));
   if (n === g.note[voice]) return;
@@ -181,10 +157,8 @@ function draw(ctx) {
   ctx.print(0, 0, (ge.name || '').slice(0, 7), 1);
   ctx.print(44, 0, (g.name || '').slice(0, 8), 1);
   ctx.print(96, 0, pos + '/' + ge.count, 1);
-  if (g.shift) ctx.print(122, 0, '^', 1);
 
-  const used = [];
-  for (let v = 0; v < NUM_VOICES; v++) if (g.rows[v] && g.rows[v].length) used.push(v);
+  const used = usedVoices();
 
   const steps = g.steps;
   const gridX = 50, gridW = 76;   /* leaves room for label + pad + knob tag */
@@ -195,9 +169,9 @@ function draw(ctx) {
 
   for (let r = 0; r < used.length; r++) {
     const v = used[r], row = g.rows[v], y = topY + r * pitch;
-    ctx.print(0, y, VOICES[v].label, 1);           /* KCK  */
-    ctx.print(20, y, padLabel(g.note[v]), 1);       /* p3   */
-    ctx.print(38, y, knobTag(v), 1);                /* 3 / 7 / s3 */
+    ctx.print(0, y, VOICES[v].label, 1);                     /* KCK  */
+    ctx.print(20, y, padLabel(g.note[v]), 1);                 /* p3   */
+    ctx.print(38, y, r < 6 ? 'K' + (r + 3) : '', 1);          /* K3.. positional */
     for (let s = 0; s < steps && s < row.length; s++) {
       const c = row[s];
       if (c === '.') continue;
@@ -211,8 +185,7 @@ function draw(ctx) {
     }
   }
 
-  ctx.print(0, 57, g.shift ? 'SHIFT: extra-voice pads'
-                           : 'jog K1:gen K2:sw:' + g.swing + ' K3+:pad', 1);
+  ctx.print(0, 57, 'jog K1:gen K2:sw:' + g.swing, 1);
 }
 
 globalThis.canvas_overlay = {
@@ -223,15 +196,13 @@ globalThis.canvas_overlay = {
     const d = payload && payload.data;
     if (!d || d.length < 3) return;
     const type = d[0] & 0xF0, b1 = d[1], b2 = d[2];
-    if (type !== 0xB0) return;
-    if (b1 === CC_SHIFT) { g.shift = b2 > 0; return; }   /* momentary bank modifier */
-    if (b2 === 0) return;                                 /* encoders: 1..63 +, 64..127 - */
+    if (type !== 0xB0 || b2 === 0) return;   /* encoders: 1..63 = +, 64..127 = - */
     const dir = b2 < 64 ? 1 : -1;
     if (b1 === CC_JOG)   { cyclePattern(ctx, dir); return; }
     if (b1 === CC_KNOB1) { switchGenre(ctx, dir); return; }
     if (b1 === CC_KNOB2) { setSwing(ctx, dir); return; }
     if (b1 >= CC_KNOB3 && b1 <= CC_KNOB8) {
-      editNote(ctx, knobVoice(b1 - 70, g.shift), dir);   /* b1-70 = knob number 3..8 */
+      editNote(ctx, usedVoices()[b1 - CC_KNOB3], dir);   /* positional: K3 -> row 0 */
       return;
     }
   },
