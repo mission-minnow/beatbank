@@ -49,8 +49,8 @@ or anywhere you can drop a text file.
 house, techno, electro, disco, UK garage · drum & bass, jungle, breakbeat,
 dubstep · funk (Funky Drummer, Cold Sweat, Purdie shuffle…), soul/Motown,
 rock/pop, gospel, country · bossa nova, samba, Latin, Afrobeat, reggae/dub,
-calypso. Browse them genre-first: jog cycles within a genre, Left/Right jump
-between genres.
+calypso. Browse them genre-first: jog cycles within a genre, Knob 1 switches
+genre.
 
 ## Setup & use
 
@@ -65,7 +65,7 @@ between genres.
 Menu: **Pattern View** · **Globals** · **Swap / None**.
 
 - **Pattern** — a fullscreen grid view with **genre-first** browsing:
-  **jog** cycles patterns *within the current genre*, **Left/Right** switch
+  **jog** cycles patterns *within the current genre*, **Knob 1** switches
   genre (the header shows `GENRE · name · pos/count`). **jog-click / Back**
   exits. Each voice row shows the note *and the drum-rack pad number* it drives
   (`p1`…`p16`), so you can see which pad to swap in your sampler (e.g. MrDrums).

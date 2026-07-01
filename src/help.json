@@ -35,7 +35,7 @@
         "view. Genre-first:",
         " - jog: cycle beats in",
         "   the current genre",
-        " - </>: switch genre",
+        " - knob 1: switch genre",
         "It shows the grid and",
         "the note/pad each drum",
         "drives. Click/Back exit.",

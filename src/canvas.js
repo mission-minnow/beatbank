@@ -2,9 +2,13 @@
  * canvas.js — Beat Bank Pattern View (Schwung canvas overlay).
  *
  * Genre-first browsing of the (large) library:
- *   - jog turn        -> cycle patterns WITHIN the current genre
- *   - Left / Right    -> switch genre (jumps to that genre's first pattern)
+ *   - jog turn         -> cycle patterns WITHIN the current genre
+ *   - Knob 1 turn      -> switch genre (jumps to that genre's first pattern)
  *   - jog click / Back -> exit (host closes the canvas; the pick is already set)
+ *
+ * Genre switching is on Knob 1 (an encoder the shadow chain UI owns), not the
+ * nav arrows — Move's firmware consumes the arrows for its own sequencer, so
+ * they never reach a chain-preview canvas.
  *
  * Shows the step grid plus, per voice, the MIDI note and the drum-rack PAD
  * number it drives (pad = note - 35, for notes 36..51) so you can see which
@@ -29,7 +33,7 @@ const VOICES = [
 ];
 const NUM_VOICES = VOICES.length;
 
-const CC_JOG = 14, CC_UP = 55, CC_DOWN = 54, CC_LEFT = 62, CC_RIGHT = 63;
+const CC_JOG = 14, CC_KNOB1 = 71;   /* jog = pattern, knob 1 = genre */
 
 const g = {
   count: 1, pattern: 0, steps: 16, name: '', genre: '',
@@ -145,7 +149,7 @@ function draw(ctx) {
     }
   }
 
-  ctx.print(0, 57, 'jog:beat   </>: genre', 1);
+  ctx.print(0, 57, 'jog:beat   K1:genre', 1);
 }
 
 globalThis.canvas_overlay = {
@@ -154,15 +158,12 @@ globalThis.canvas_overlay = {
   draw(ctx) { draw(ctx); return true; },
   onMidi(ctx, payload) {
     const d = payload && payload.data;
-    if (!d || d.length < 2) return;
-    const type = d[0] & 0xF0, b1 = d[1], b2 = d.length > 2 ? d[2] : 0;
-    if (type === 0xB0) {
-      if (b1 === CC_JOG) { cyclePattern(ctx, b2 > 0 && b2 < 64 ? 1 : -1); return; }
-      if (b2 > 0) {
-        if (b1 === CC_RIGHT || b1 === CC_UP)   { switchGenre(ctx, 1);  return; }
-        if (b1 === CC_LEFT  || b1 === CC_DOWN)  { switchGenre(ctx, -1); return; }
-      }
-    }
+    if (!d || d.length < 3) return;
+    const type = d[0] & 0xF0, b1 = d[1], b2 = d[2];
+    if (type !== 0xB0 || b2 === 0) return;   /* encoders: 1..63 = +, 64..127 = - */
+    const dir = b2 < 64 ? 1 : -1;
+    if (b1 === CC_JOG)   { cyclePattern(ctx, dir); return; }
+    if (b1 === CC_KNOB1) { switchGenre(ctx, dir); return; }
   },
   onClose() {},
   onExit() {},
