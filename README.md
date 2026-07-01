@@ -64,13 +64,21 @@ Menu is just **Pattern** (the scrolling list, name + genre) and **Swap / None**.
 No tempo, swing, preview toggles, or note editing — it follows Move's tempo and
 plays straight.
 
-## Voices
+## Voices & Note Map
 
-Twelve voices, each sending a **General MIDI drum note** (Kick 36, Snare 38,
-Closed Hat 42, Open Hat 46, Clap 39, Rim/Clave 37, Tom 45, Ride 51, Crash 49,
-Cowbell 56, Conga 63, Perc 70). Use a **GM-mapped drum kit** so they line up.
-(Cowbell/Conga/Perc sit above the usual 36–51 range — pick a kit that maps
-them, or those voices won't sound.)
+Twelve voices. The **Note Map** setting chooses which MIDI notes they send:
+
+- **`gm`** — full General MIDI drum map (Kick 36, Snare 38, Closed Hat 42,
+  Open Hat 46, Clap 39, Rim 37, Tom 45, Ride 51, Crash 49, Cowbell 56,
+  Conga 63, Perc 70). Use with **SF2 / soundfont** GM kits.
+- **`drumrack`** — everything squeezed into **36–51**, the Move/Ableton
+  drum-rack range that every Schwung drum sampler (MrDrums, Forge, KrautDrums,
+  Libpo32, …) triggers on. Cowbell/Conga/Perc move to free pads (47/48/50).
+  Use with **pad samplers**.
+
+The catalog's drum samplers all trigger on 36–51, *not* the sparse GM range —
+so in `gm` mode Cowbell/Conga/Perc (56/63/70) are silent on them; switch to
+`drumrack` to bring them in range.
 
 ## Build & install
 

@@ -33,6 +33,14 @@
 static char g_note_keys[BB_NUM_VOICES][16];
 static const host_api_v1_t *g_host = NULL;
 
+/* Note-map modes (voice order: kick snare ch oh clap rim tom ride crash cowbell conga perc).
+ *   gm       — full General MIDI drum map; correct for SF2 / soundfont GM kits.
+ *   drumrack — everything squeezed into 36..51, the Move/Ableton drum-rack pad
+ *              range that every Schwung drum sampler (MrDrums, Forge, KrautDrums,
+ *              Libpo32, ...) triggers on. cowbell/conga/perc move to free pads. */
+static const uint8_t kGmNotes[BB_NUM_VOICES]       = {36,38,42,46,39,37,45,51,49,56,63,70};
+static const uint8_t kDrumrackNotes[BB_NUM_VOICES] = {36,38,42,46,39,37,45,51,49,47,48,50};
+
 /* The pattern bank is read-only and shared across all instances. */
 static BeatBank g_bank = { NULL, 0 };
 static int      g_bank_loaded = 0;
@@ -45,7 +53,8 @@ typedef struct {
 
 typedef struct {
     int     pattern;                 /* selected index into the bank         */
-    uint8_t note[BB_NUM_VOICES];     /* GM output note per voice             */
+    uint8_t note[BB_NUM_VOICES];     /* output note per voice                */
+    uint8_t note_map;                /* 0 = gm, 1 = drumrack (36..51)         */
 
     uint8_t cur_step;
     uint8_t clock_running;           /* Move transport running               */
@@ -157,7 +166,8 @@ static void *bb_create_instance(const char *module_dir, const char *config_json)
     if (!bi) return NULL;
 
     bi->pattern = 0;
-    for (int v = 0; v < BB_NUM_VOICES; v++) bi->note[v] = bb_default_notes[v];
+    bi->note_map = 0;
+    for (int v = 0; v < BB_NUM_VOICES; v++) bi->note[v] = kGmNotes[v];
     bi->cur_step = 0;
     bi->clock_running = 0;
     bi->midi_clocks_until_tick = CLOCKS_PER_STEP;
@@ -252,8 +262,18 @@ static void bb_set_param(void *instance, const char *key, const char *val)
         }
         return;
     }
+    if (strcmp(key, "note_map") == 0) {
+        int m;
+        if (strcmp(val, "gm") == 0)            m = 0;
+        else if (strcmp(val, "drumrack") == 0) m = 1;
+        else                                   m = (atoi(val) != 0) ? 1 : 0;
+        bi->note_map = (uint8_t)m;
+        for (int v = 0; v < BB_NUM_VOICES; v++)
+            bi->note[v] = m ? kDrumrackNotes[v] : kGmNotes[v];
+        return;
+    }
     for (int v = 0; v < BB_NUM_VOICES; v++)
-        if (strcmp(key, g_note_keys[v]) == 0) { bi->note[v] = (uint8_t)parse_int(val, 0, 127, bb_default_notes[v]); return; }
+        if (strcmp(key, g_note_keys[v]) == 0) { bi->note[v] = (uint8_t)parse_int(val, 0, 127, kGmNotes[v]); return; }
 }
 
 static int indexed_key(const char *key, const char *prefix)
@@ -280,6 +300,7 @@ static int bb_get_param(void *instance, const char *key, char *buf, int buf_len)
     if (strcmp(key, "play_step") == 0)     return snprintf(buf, buf_len, "%u", bi->cur_step);
     if (strcmp(key, "playing") == 0)       return snprintf(buf, buf_len, "%u", bi->clock_running);
     if (strcmp(key, "preview_rev") == 0)   return snprintf(buf, buf_len, "%u", bi->preview_revision);
+    if (strcmp(key, "note_map") == 0)      return snprintf(buf, buf_len, "%s", bi->note_map ? "drumrack" : "gm");
 
     gi = indexed_key(key, "name");
     if (gi >= 0) { const BeatPattern *q = pattern_at(gi); return snprintf(buf, buf_len, "%s", q ? q->name : ""); }

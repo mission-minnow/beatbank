@@ -17,8 +17,10 @@
                 "root": {
                     "name": "Beat Bank",
                     "params": [
-                        { "level": "patterns", "label": "Pattern" }
-                    ]
+                        { "level": "patterns", "label": "Pattern" },
+                        "note_map"
+                    ],
+                    "knobs": ["note_map"]
                 },
                 "patterns": {
                     "name": "Pattern",
@@ -31,6 +33,7 @@
         }
     },
     "chain_params": [
-        { "key": "pattern", "name": "Pattern", "type": "int", "min": 0, "max": 399, "default": 0, "step": 1 }
+        { "key": "pattern", "name": "Pattern", "type": "int", "min": 0, "max": 399, "default": 0, "step": 1 },
+        { "key": "note_map", "name": "Note Map", "type": "enum", "options": ["gm", "drumrack"], "default": 0 }
     ]
 }

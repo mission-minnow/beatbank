@@ -35,6 +35,27 @@
       ]
     },
     {
+      "title": "Note Map",
+      "lines": [
+        "Sets which MIDI notes",
+        "the drums use:",
+        "",
+        " gm - full General MIDI",
+        "  drum map. Use with",
+        "  SF2 / soundfont kits.",
+        "",
+        " drumrack - all notes",
+        "  in 36-51, the Move",
+        "  drum-rack range. Use",
+        "  with MrDrums and",
+        "  other pad samplers.",
+        "",
+        "Cowbell/Conga/Perc only",
+        "sound in drumrack mode",
+        "on 36-51 samplers."
+      ]
+    },
+    {
       "title": "Recording",
       "lines": [
         "Record the Schwung way:",
