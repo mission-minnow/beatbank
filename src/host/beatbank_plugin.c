@@ -12,7 +12,8 @@
  * NO randomness. Patterns load from external .beat files (see patterns.c).
  * It plays straight at Move's tempo — silent unless the transport is running.
  *
- *   0xFA reset to step 0 · 0xF8 advance (6 clocks / 16th), looping · 0xFC stop.
+ *   0xFA fires step 0 on the downbeat · 0xF8 advances (6 clocks / 16th),
+ *   looping · 0xFC stop.
  */
 
 #include "midi_fx_api_v1.h"
@@ -205,8 +206,14 @@ static int bb_process_midi(void *instance, const uint8_t *in_msg, int in_len,
     if (in_msg[0] == 0xFAu) {                     /* Start */
         int count = flush_all(bi, out_msgs, out_lens, max_out, 0);
         bi->cur_step = 0;
-        bi->midi_clocks_until_tick = clocks_before_step(bi, 0);
         bi->clock_running = 1;
+        /* Fire the downbeat ON Start, coincident with Move's transport (its
+         * native tracks do the same). Counting a full step before step 0 put
+         * the whole beat one 16th behind. fire_step advances cur_step, so the
+         * NEXT step is then scheduled a normal interval out. */
+        if (count < max_out)
+            count = fire_step(bi, out_msgs, out_lens, max_out, count);
+        bi->midi_clocks_until_tick = clocks_before_step(bi, bi->cur_step);
         return count;
     }
     if (in_msg[0] == 0xFBu) {                      /* Continue */

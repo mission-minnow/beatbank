@@ -5,7 +5,8 @@
  *
  * Beat Bank emits its notes directly from process_midi (on the clock), which
  * the chain feeds to the slot synth. Straight 16ths: a step every 6 clocks,
- * step 0 firing 6 clocks after Start (0xFA).
+ * with step 0 firing on the Start message (0xFA) itself — the downbeat lands
+ * with Move's transport, not a 16th behind it.
  */
 
 #include "midi_fx_api_v1.h"
@@ -44,13 +45,19 @@ static void write_test_patterns(void)
 }
 
 /* Send 0xFA (start), then nclocks of 0xF8; record the clock number of each
- * note-on matching match_note (<0 = any) from process_midi's output. */
+ * note-on matching match_note (<0 = any) from process_midi's output. Step 0
+ * fires on the Start message itself (the downbeat), recorded as clock 0. */
 static int run_bar(midi_fx_api_v1_t *api, void *inst, int match, int *clk, int maxc, int nclocks)
 {
     uint8_t out[MIDI_FX_MAX_OUT_MSGS][3];
     int lens[MIDI_FX_MAX_OUT_MSGS];
     uint8_t b; int count = 0;
-    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
+    b = 0xFA;
+    int n0 = api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
+    for (int i = 0; i < n0; i++)
+        if ((out[i][0] & 0xF0) == 0x90 && out[i][2] > 0 && (match < 0 || out[i][1] == match)) {
+            if (count < maxc) clk[count] = 0; count++; break;
+        }
     for (int c = 1; c <= nclocks; c++) {
         b = 0xF8;
         int n = api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
@@ -77,38 +84,41 @@ int main(void)
 
     api->set_param(inst, "pattern", "0");     /* All Hits: every step fires */
 
-    printf("\nStraight 16ths: a step every 6 clocks\n");
-    int ns = run_bar(api, inst, -1, clk, 64, 96);
+    printf("\nStraight 16ths: step 0 on the downbeat, then every 6 clocks\n");
+    int ns = run_bar(api, inst, -1, clk, 64, 90);
     CHECK(ns == 16, "16 step-fires in one bar");
-    CHECK(ns >= 3 && clk[0] == 6 && clk[1] == 12 && clk[2] == 18, "fires at clocks 6,12,18...");
-    CHECK(ns == 16 && clk[15] == 96, "bar ends at clock 96");
+    CHECK(ns >= 3 && clk[0] == 0 && clk[1] == 6 && clk[2] == 12,
+          "step 0 on Start (clock 0), then 6,12...");
+    CHECK(ns == 16 && clk[15] == 90, "step 15 at clock 90");
 
     printf("\nKick lands on the four beats\n");
-    int nk = run_bar(api, inst, 36, clk, 64, 96);
-    CHECK(nk == 4 && clk[0] == 6 && clk[1] == 30 && clk[2] == 54 && clk[3] == 78,
-          "kick at clocks 6,30,54,78");
+    int nk = run_bar(api, inst, 36, clk, 64, 90);
+    CHECK(nk == 4 && clk[0] == 0 && clk[1] == 24 && clk[2] == 48 && clk[3] == 72,
+          "kick at clocks 0,24,48,72 (beats 1-4)");
 
     printf("\nLoops continuously (two bars = 32 fires)\n");
-    int n2 = run_bar(api, inst, -1, clk, 64, 192);
+    int n2 = run_bar(api, inst, -1, clk, 64, 186);
     CHECK(n2 == 32, "32 step-fires across two bars");
+    CHECK(n2 == 32 && clk[16] == 96, "bar 2 downbeat at clock 96");
 
     printf("\nSwing delays the off-beat 16ths\n");
     api->set_param(inst, "swing", "100");
-    int sw = run_bar(api, inst, -1, clk, 64, 96);
+    int sw = run_bar(api, inst, -1, clk, 64, 95);
     CHECK(sw == 16, "swing keeps 16 fires");
-    CHECK(sw >= 4 && clk[0] == 4 && clk[1] == 12 && clk[2] == 16 && clk[3] == 24,
-          "swung off-beats late (clocks 4,12,16,24)");
-    CHECK(sw == 16 && clk[15] == 96, "swung bar still ends at clock 96");
+    CHECK(sw >= 4 && clk[0] == 0 && clk[1] == 8 && clk[2] == 12 && clk[3] == 20,
+          "downbeat on grid, off-beats swung late (0,8,12,20)");
+    CHECK(sw == 16 && clk[15] == 92, "last off-beat 16th at clock 92");
     api->set_param(inst, "swing", "0");
 
     printf("\nPattern switch -> snare backbeat\n");
     api->set_param(inst, "pattern", "1");
-    int nsn = run_bar(api, inst, 38, clk, 64, 96);
-    CHECK(nsn == 2 && clk[0] == 30 && clk[1] == 78, "snare at clocks 30,78 (beats 2 & 4)");
+    int nsn = run_bar(api, inst, 38, clk, 64, 90);
+    CHECK(nsn == 2 && clk[0] == 24 && clk[1] == 72, "snare at clocks 24,72 (beats 2 & 4)");
 
     printf("\nStop flushes held notes\n");
-    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    for (int c = 1; c <= 6; c++) { b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS); } /* step 0 fires */
+    api->set_param(inst, "pattern", "0");     /* All Hits: step 0 always has notes */
+    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS); /* step 0 fires on Start, held */
+    b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS); /* 1 clock < gate: still held */
     b = 0xFC;
     int fn = api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
     int offs = 0;
