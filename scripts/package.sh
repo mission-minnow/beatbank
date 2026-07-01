@@ -43,7 +43,6 @@ rm -rf "${STAGE_DIR}" "${ARCHIVE_PATH}"
 mkdir -p "${STAGE_DIR}"
 
 cp "${MODULE_MANIFEST}" "${STAGE_DIR}/module.json"
-cp src/canvas.js        "${STAGE_DIR}/canvas.js"
 [ -f src/help.json ] && cp src/help.json "${STAGE_DIR}/help.json"
 # Shipped default patterns (the DSP scans <module_dir>/patterns/*.beat)
 mkdir -p "${STAGE_DIR}/patterns"

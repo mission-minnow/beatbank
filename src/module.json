@@ -3,7 +3,7 @@
     "name": "Beat Bank",
     "abbrev": "BANK",
     "version": "0.1.0",
-    "description": "Library of standard drum patterns from editable .beat files — no randomness, follows Move's transport.",
+    "description": "Library of standard drum patterns from editable .beat files — pick a pattern, it prints one bar into Move.",
     "author": "Schwung Move",
     "api_version": 2,
     "dsp": "dsp.so",
@@ -16,49 +16,21 @@
             "levels": {
                 "root": {
                     "name": "Beat Bank",
+                    "params": [
+                        { "level": "patterns", "label": "Pattern" }
+                    ]
+                },
+                "patterns": {
+                    "name": "Pattern",
                     "list_param": "pattern",
                     "count_param": "pattern_count",
                     "name_param": "pattern_label",
-                    "knobs": ["pattern"],
-                    "params": [
-                        { "key": "view", "name": "Pattern View", "type": "canvas", "canvas_script": "canvas.js", "show_value": false, "show_footer": false },
-                        { "level": "notes", "label": "Drum Notes" }
-                    ]
-                },
-                "notes": {
-                    "name": "Drum Notes",
-                    "params": [
-                        { "key": "kick_note", "name": "Kick" },
-                        { "key": "snare_note", "name": "Snare" },
-                        { "key": "ch_note", "name": "Closed Hat" },
-                        { "key": "oh_note", "name": "Open Hat" },
-                        { "key": "clap_note", "name": "Clap" },
-                        { "key": "rim_note", "name": "Rim/Clave" },
-                        { "key": "tom_note", "name": "Tom" },
-                        { "key": "ride_note", "name": "Ride" },
-                        { "key": "crash_note", "name": "Crash" },
-                        { "key": "cowbell_note", "name": "Cowbell" },
-                        { "key": "conga_note", "name": "Conga" },
-                        { "key": "perc_note", "name": "Perc" }
-                    ],
-                    "knobs": ["kick_note", "snare_note", "ch_note", "oh_note", "clap_note", "rim_note", "tom_note", "ride_note"]
+                    "knobs": ["pattern"]
                 }
             }
         }
     },
     "chain_params": [
-        { "key": "pattern", "name": "Pattern", "type": "int", "min": 0, "max": 399, "default": 0, "step": 1 },
-        { "key": "kick_note", "name": "Kick Note", "type": "int", "min": 0, "max": 127, "default": 36, "step": 1 },
-        { "key": "snare_note", "name": "Snare Note", "type": "int", "min": 0, "max": 127, "default": 38, "step": 1 },
-        { "key": "ch_note", "name": "Closed Hat Note", "type": "int", "min": 0, "max": 127, "default": 42, "step": 1 },
-        { "key": "oh_note", "name": "Open Hat Note", "type": "int", "min": 0, "max": 127, "default": 46, "step": 1 },
-        { "key": "clap_note", "name": "Clap Note", "type": "int", "min": 0, "max": 127, "default": 39, "step": 1 },
-        { "key": "rim_note", "name": "Rim/Clave Note", "type": "int", "min": 0, "max": 127, "default": 37, "step": 1 },
-        { "key": "tom_note", "name": "Tom Note", "type": "int", "min": 0, "max": 127, "default": 45, "step": 1 },
-        { "key": "ride_note", "name": "Ride Note", "type": "int", "min": 0, "max": 127, "default": 51, "step": 1 },
-        { "key": "crash_note", "name": "Crash Note", "type": "int", "min": 0, "max": 127, "default": 49, "step": 1 },
-        { "key": "cowbell_note", "name": "Cowbell Note", "type": "int", "min": 0, "max": 127, "default": 56, "step": 1 },
-        { "key": "conga_note", "name": "Conga Note", "type": "int", "min": 0, "max": 127, "default": 63, "step": 1 },
-        { "key": "perc_note", "name": "Perc Note", "type": "int", "min": 0, "max": 127, "default": 70, "step": 1 }
+        { "key": "pattern", "name": "Pattern", "type": "int", "min": 0, "max": 399, "default": 0, "step": 1 }
     ]
 }

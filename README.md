@@ -3,18 +3,14 @@
 A library of **standard drum patterns** for [Schwung](https://github.com/charlesvestal/schwung) on Ableton Move.
 
 No generation, no randomness, no fills. Beat Bank is a chainable `midi_fx`
-that plays one of ~100 hand-authored, canonical drum grids straight into
-whatever drum kit follows it in the chain — so you can drop in a recognizable
-groove from almost any genre instead of programming one by hand.
+that **prints** one of ~100 hand-authored, canonical drum grids straight into
+Move's step sequencer — so you can drop in a recognizable groove from almost
+any genre instead of programming one by hand.
 
-```
-[Beat Bank MIDI FX] → [Drum Kit Sound Generator] → [Audio FX] → out
-```
-
-Beat Bank deliberately has **no tempo or swing controls** — it follows Move's
-transport and tempo and plays the grid straight, so it never competes with
-Move's own groove. (It stays silent unless Move's MIDI Clock Out is on and the
-transport is running.)
+Pick a pattern from a list; it splats one bar into Move's clip (which Move
+records). That's the whole tool — no tempo, swing, preview, or note editing.
+It plays the grid straight at Move's tempo, so it never competes with Move's
+own groove.
 
 ## Patterns are editable files — add your own
 
@@ -53,63 +49,45 @@ electro, disco, UK garage · drum & bass, jungle, breakbeat, dubstep · funk
 (Funky Drummer, Cold Sweat, Purdie shuffle…), soul/Motown, rock/pop, gospel,
 country · bossa nova, samba, Latin, Afrobeat, reggae/dub, calypso.
 
-## Voices
-
-Twelve voices, each sending a General MIDI drum note by default. Remap any
-voice in the Drum Notes menu to match your kit's pads.
-
-| Voice | Default | Voice | Default |
-|-------|---------|-------|---------|
-| Kick | 36 | Ride | 51 |
-| Snare | 38 | Crash | 49 |
-| Closed Hat | 42 | Cowbell | 56 |
-| Open Hat | 46 | Conga | 63 |
-| Clap | 39 | Perc (shaker/tamb) | 70 |
-| Rim / Clave | 37 | Tom | 45 |
-
 ## Controls
 
-Beat Bank uses Schwung's standard chain menu (like any synth/FX), so it's
-fully swappable. Open the slot's **MIDI FX** to get:
+Dead simple. Beat Bank uses Schwung's standard chain menu (so it's fully
+swappable). Open the slot's **MIDI FX** and you get two entries:
 
-- **Pattern** — scroll to change it; the beat updates live, with the name +
-  genre shown.
-- **Drum Notes** — a submenu of the 12 voice notes. **Scrolling a voice
-  auditions it** — Beat Bank fires that note into the kit so you can map each
-  voice to the right drum *by ear* (Move kits have no fixed pad→note layout, so
-  this is how you line them up).
+- **Pattern** — a scrolling list of the whole library (name + genre). **Land on
+  a pattern and it prints one bar into Move** (auto, after a brief settle).
+  Scroll to another to print a different one.
 - **Swap Module** — change Beat Bank for another MIDI FX, or pick **None** to
   clear it.
 
-## Two ways to use it
+No preview, no note editing, no buttons — pick a pattern, it splats.
 
-**1. Live, into a Schwung slot synth.** Load Beat Bank as a slot's MIDI FX in
-front of a drum sound-generator (an SF2 drum kit, etc.). Pick a pattern; it
-plays in sync with Move's transport.
+## Voices
 
-**2. Print into Move's native sequencer.** Capture a pattern as a real,
-editable Move clip — so Move owns it and you switch it with Move's own pattern
-buttons. This uses the chain's **Schw+Move** injection mode:
+Twelve voices, each sending a **General MIDI drum note** (Kick 36, Snare 38,
+Closed Hat 42, Open Hat 46, Clap 39, Rim/Clave 37, Tom 45, Ride 51, Crash 49,
+Cowbell 56, Conga 63, Perc 70). Use a **GM-mapped drum kit** on the Move track
+so they line up; if your kit maps pads differently, remap on the Move side.
 
-1. On **Move**: pick the drum track to fill, and note its MIDI channel
-   (track *N* defaults to channel *N*). Its drum kit owns the 16 pads.
+## Print into Move's native sequencer
+
+Beat Bank prints the selected pattern as one clean bar that Move records into a
+clip you own and can edit/switch natively.
+
+1. On **Move**: pick the drum track to fill, note its MIDI channel (track *N*
+   defaults to channel *N*). Its drum kit owns the 16 pads.
 2. In **Schwung**, on a shadow slot: set **MIDI FX = Beat Bank**, switch the
-   slot's **MIDI FX mode to Schw+Move**, and set the slot's **Receive Channel**
-   to that track's channel. (A slot needs a sound generator to be valid — load
-   any and **mute the slot** so only Move's kit sounds; injection is on the
-   MIDI path and keeps working.)
-3. Pick a Beat Bank pattern (jog).
-4. On **Move**: **arm Record** on that track and start the transport. Beat Bank
-   plays in sync and injects its notes into Move, which **records them into the
-   current pattern**.
-5. Stop after a bar. That pattern is now a native, editable Move clip.
-6. Switch Move's pattern slot, pick another Beat Bank pattern, repeat — build
-   up all of the track's patterns.
+   slot's **MIDI FX mode to Schw+Move**, set the slot's **Receive Channel** to
+   that track's channel, and **mute the slot** (a slot needs a sound generator
+   to be valid — load any; injection is on the MIDI path and keeps working).
+3. On **Move**: **arm Record** on that track and start playing.
+4. Open **Pattern**, scroll to the one you want — it prints one bar and Move
+   records it. Scroll to another to replace it.
 
-> Note: injected notes use Beat Bank's voice notes (kick 36, snare 38, …). A
-> standard Move drum kit maps pads to notes 36–51, so Kick/Snare/Hats/Clap/
-> Rim/Tom/Ride/Crash land on pads out of the box; Cowbell/Conga/Perc default
-> above 51 — remap them in the Drum Notes menu if your kit needs them.
+> Beat Bank can inject the notes but can't operate Move's transport, so **Move
+> must be playing + recording** to capture. Injected notes are the GM drum map;
+> Cowbell/Conga/Perc sit above the usual 36–51 pad range, so use a kit that maps
+> them or they won't sound.
 >
 > The record-capture path was confirmed on hardware (Move records external
 > USB/injected MIDI into its step sequencer). The exact slot wiring (Schw+Move

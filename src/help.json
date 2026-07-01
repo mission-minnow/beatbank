@@ -8,82 +8,44 @@
         "patterns across many",
         "genres. No randomness.",
         "",
-        "Load it as the MIDI FX",
-        "in front of a drum kit",
-        "and press Play. The",
-        "pattern plays straight",
-        "and follows Move's",
-        "tempo - Beat Bank has",
-        "no tempo or swing of",
-        "its own."
+        "Pick a pattern and it",
+        "prints one bar into",
+        "Move's step sequencer.",
+        "That's it."
       ]
     },
     {
-      "title": "Selecting Patterns",
+      "title": "How to use",
       "lines": [
-        "Open the slot's MIDI",
-        "FX (Beat Bank). Menu:",
-        " - Pattern: scroll to",
-        "   change it (live).",
-        " - Pattern View: full",
-        "   grid view + Print",
-        "   (jog scrolls, Pad1",
-        "   Print, Pad2 Play/",
-        "   Stop). Jog-click or",
-        "   Back exits it.",
-        " - Drum Notes (submenu)",
-        " - Swap Module / None"
-      ]
-    },
-    {
-      "title": "Drum Notes",
-      "lines": [
-        "In the Drum Notes",
-        "submenu, 12 voices each",
-        "send a GM drum note",
-        "(kick 36, snare 38,",
-        "hats 42/46 ...).",
+        "The menu has just:",
+        " - Pattern",
+        " - Swap Module / None",
         "",
-        "Move kits vary, so map",
-        "by ear: scroll a voice",
-        "and you HEAR that note",
-        "fire on the kit. Stop",
-        "when you hear the kick,",
-        "then snare, etc."
+        "Open Pattern -> a list.",
+        "Scroll to a pattern and",
+        "land on it: it splats",
+        "one bar into Move (name",
+        "+ genre shown).",
+        "",
+        "Scroll to another to",
+        "print a different one."
       ]
     },
     {
-      "title": "Print to Move",
+      "title": "Setup for printing",
       "lines": [
-        "Capture a pattern as a",
-        "real Move clip:",
-        "",
         "1 Slot MIDI FX mode ->",
         "  Schw+Move; Receive",
         "  Ch = the drum track.",
-        "2 Mute the slot. Open",
-        "  Pattern View; Pad2",
-        "  to Stop the loop.",
-        "3 On Move: arm Record",
-        "  + start transport.",
-        "4 Pad1 (Print) fires",
-        "  ONE clean bar; Move",
-        "  records it.",
-        "5 Switch Move pattern,",
-        "  repeat."
-      ]
-    },
-    {
-      "title": "Sync",
-      "lines": [
-        "Beat Bank follows",
-        "Move's transport over",
-        "MIDI clock. It needs",
-        "Settings -> MIDI ->",
-        "MIDI Clock Out -> On,",
-        "and the transport",
-        "running, or it stays",
-        "silent."
+        "  Mute the slot.",
+        "2 On Move: arm Record",
+        "  + start playing.",
+        "3 Pick a pattern -> it",
+        "  records into the",
+        "  current Move clip.",
+        "",
+        "Move must be playing +",
+        "recording to capture."
       ]
     },
     {
@@ -96,9 +58,7 @@
         "  beatbank/patterns/",
         "",
         "See _HOWTO.txt there",
-        "for the format. Your",
-        "patterns appear after",
-        "the built-ins."
+        "for the format."
       ]
     }
   ]

@@ -1,12 +1,11 @@
 /*
- * sequencer_test.c — drive the Beat Bank plugin through MIDI clock and verify
- * note placement. Loads a real .beat file via the bank loader (module_dir).
+ * sequencer_test.c — drive the Beat Bank plugin and verify note placement.
+ * Loads a real .beat file via the bank loader (module_dir).
  *
- * Covers:
- *   - move-clock path (0xFA start + 0xF8 ticks), straight 16th stepping
- *   - correct step placement (kick on beats, full-grid hat every 6 clocks)
- *   - pattern switch via set_param
- *   - 0xFC flushes held notes
+ * Beat Bank is a print tool: it emits only a one-shot bar, triggered either
+ * explicitly (set_param "print") or by settling on a pattern (debounced
+ * auto-splat). Note events are emitted from tick(), so we pump tick() after
+ * each clock (as the chain does).
  */
 
 #include "midi_fx_api_v1.h"
@@ -31,51 +30,33 @@ static const char *MODROOT = "build/native/test_modroot";
 
 static void write_test_patterns(void)
 {
-    mkdir("build", 0775);
-    mkdir("build/native", 0775);
-    mkdir(MODROOT, 0775);
+    mkdir("build", 0775); mkdir("build/native", 0775); mkdir(MODROOT, 0775);
     mkdir("build/native/test_modroot/patterns", 0775);
     FILE *fp = fopen("build/native/test_modroot/patterns/00-test.beat", "wb");
     if (!fp) { printf("  !! FAIL: cannot write test .beat\n"); failures++; return; }
     fputs(
-        "name: All Hits\n"
-        "genre: TEST\n"
-        "steps: 16\n"
-        "ch:    xxxxxxxxxxxxxxxx\n"
-        "kick:  x...x...x...x...\n"
-        "\n"
-        "name: Backbeat\n"
-        "genre: TEST\n"
-        "steps: 16\n"
-        "kick:  x...x...x...x...\n"
-        "snare: ....A.......A...\n",
+        "name: All Hits\n" "genre: TEST\n" "steps: 16\n"
+        "ch:    xxxxxxxxxxxxxxxx\n" "kick:  x...x...x...x...\n\n"
+        "name: Backbeat\n" "genre: TEST\n" "steps: 16\n"
+        "kick:  x...x...x...x...\n" "snare: ....A.......A...\n",
         fp);
     fclose(fp);
 }
 
-/* Run one bar; record clock numbers where a note-on for match_note fires
- * (match_note < 0 = any). Note events are emitted from tick(), so we pump
- * tick() right after each clock to drain the queue (emulating the chain). */
-static int run_bar(midi_fx_api_v1_t *api, void *inst, int match_note, int *clk, int max)
+/* Assumes clock is running. Runs nclocks of 0xF8 (+ tick each), recording the
+ * clock number of each note-on matching match_note (<0 = any). */
+static int run_clocks(midi_fx_api_v1_t *api, void *inst, int match, int *clk, int maxc, int nclocks)
 {
     uint8_t out[MIDI_FX_MAX_OUT_MSGS][3];
     int lens[MIDI_FX_MAX_OUT_MSGS];
-    uint8_t b;
-    int count = 0;
-    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    for (int c = 1; c <= 96; c++) {
-        b = 0xF8;
-        api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
+    uint8_t b; int count = 0;
+    for (int c = 1; c <= nclocks; c++) {
+        b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
         int n = api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
-        for (int i = 0; i < n; i++) {
-            if ((out[i][0] & 0xF0) == 0x90 && out[i][2] > 0 &&
-                (match_note < 0 || out[i][1] == match_note)) {
-                if (count < max) clk[count] = c;
-                count++;
-                break;
+        for (int i = 0; i < n; i++)
+            if ((out[i][0] & 0xF0) == 0x90 && out[i][2] > 0 && (match < 0 || out[i][1] == match)) {
+                if (count < maxc) clk[count] = c; count++; break;
             }
-        }
     }
     return count;
 }
@@ -83,90 +64,60 @@ static int run_bar(midi_fx_api_v1_t *api, void *inst, int match_note, int *clk, 
 int main(void)
 {
     write_test_patterns();
-
     midi_fx_api_v1_t *api = move_midi_fx_init(&g_host);
     int clk[64];
+    uint8_t out[MIDI_FX_MAX_OUT_MSGS][3]; int lens[MIDI_FX_MAX_OUT_MSGS]; uint8_t b;
 
-    /* First create_instance loads the global bank from our module dir. */
     void *inst = api->create_instance(MODROOT, NULL);
     char buf[32];
     int count = (api->get_param(inst, "pattern_count", buf, sizeof(buf)), atoi(buf));
-    printf("Loaded %d patterns from .beat file\n", count);
+    printf("Loaded %d patterns\n", count);
     CHECK(count >= 2, "loaded the two test patterns");
 
-    /* Pattern 0 = All Hits: every step fires (ch), kick on beats. */
-    api->set_param(inst, "pattern", "0");
-
-    printf("\nStraight 16ths: a step every 6 clocks\n");
-    int ns = run_bar(api, inst, -1, clk, 64);
-    CHECK(ns == 16, "16 step-fires in the bar");
-    CHECK(ns >= 3 && clk[0] == 6 && clk[1] == 12 && clk[2] == 18, "fires at 6,12,18,...");
-    CHECK(ns == 16 && clk[15] == 96, "bar ends at clock 96");
-
-    printf("\nKick lands on beats 1-4 (clocks 6,30,54,78)\n");
-    int nk = run_bar(api, inst, 36, clk, 64);
-    CHECK(nk == 4 && clk[0] == 6 && clk[1] == 30 && clk[2] == 54 && clk[3] == 78,
-          "kick at clocks 6,30,54,78");
-
-    /* Switch to pattern 1 = Backbeat: snare (38) on beats 2 & 4. */
-    printf("\nPattern switch -> snare backbeat\n");
-    api->set_param(inst, "pattern", "1");
-    int nsn = run_bar(api, inst, 38, clk, 64);
-    CHECK(nsn == 2 && clk[0] == 30 && clk[1] == 78, "snare at clocks 30,78 (beats 2 & 4)");
-
-    /* Stop flushes (note-offs are queued by 0xFC, emitted on the next tick). */
-    printf("\nStop flushes held notes\n");
-    uint8_t out[MIDI_FX_MAX_OUT_MSGS][3]; int lens[MIDI_FX_MAX_OUT_MSGS]; uint8_t b;
+    /* Isolate explicit print for the timing checks. */
+    api->set_param(inst, "auto_print", "0");
     b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
     api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    for (int c = 1; c <= 5; c++) { b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS); }
-    b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);  /* step 0 fires (kick) */
-    api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);              /* drain the note-on */
-    b = 0xFC; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS); /* queues note-off(s) */
-    int n = api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
+
+    printf("\nExplicit print = exactly one bar\n");
+    api->set_param(inst, "pattern", "0");     /* All Hits */
+    api->set_param(inst, "print", "1");
+    int n = run_clocks(api, inst, -1, clk, 64, 120);
+    CHECK(n == 16, "16 step-fires (one bar)");
+    CHECK(n >= 3 && clk[0] == 1 && clk[1] == 7 && clk[2] == 13, "steps at clocks 1,7,13...");
+    CHECK(n == 16 && clk[15] == 91, "last step at clock 91");
+
+    printf("\nKick lands on the four beats\n");
+    api->set_param(inst, "print", "1");
+    int nk = run_clocks(api, inst, 36, clk, 64, 120);
+    CHECK(nk == 4 && clk[0] == 1 && clk[1] == 25 && clk[2] == 49 && clk[3] == 73,
+          "kick at clocks 1,25,49,73 (beats 1-4)");
+
+    printf("\nPattern switch -> snare backbeat\n");
+    api->set_param(inst, "pattern", "1");     /* Backbeat (auto_print off = no splat) */
+    api->set_param(inst, "print", "1");
+    int ns = run_clocks(api, inst, 38, clk, 64, 120);
+    CHECK(ns == 2 && clk[0] == 25 && clk[1] == 73, "snare at clocks 25,73 (beats 2 & 4)");
+
+    printf("\nStop flushes held notes\n");
+    api->set_param(inst, "print", "1");
+    run_clocks(api, inst, -1, clk, 64, 2);    /* fire step 0 (a note is held) */
+    b = 0xFC; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
+    int fn = api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
     int offs = 0;
-    for (int i = 0; i < n; i++)
-        if ((out[i][0] & 0xF0) == 0x80 || ((out[i][0] & 0xF0) == 0x90 && out[i][2] == 0)) offs++;
+    for (int i = 0; i < fn; i++)
+        if ((out[i][0] & 0xF0) == 0x80 || (out[i][2] == 0)) offs++;
     CHECK(offs >= 1, "stop emits note-off(s)");
 
-    /* Audition: set_param("audition", v) fires voice v's note on the next tick. */
-    printf("\nAudition fires the voice's note\n");
-    api->set_param(inst, "kick_note", "36");
-    api->set_param(inst, "audition", "0");   /* voice 0 = kick */
-    int an = api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    int got_on = 0, got_off = 0;
-    for (int i = 0; i < an; i++) {
-        if ((out[i][0] & 0xF0) == 0x90 && out[i][1] == 36 && out[i][2] > 0) got_on = 1;
-        if (((out[i][0] & 0xF0) == 0x80 || (out[i][2] == 0)) && out[i][1] == 36) got_off = 1;
-    }
-    CHECK(got_on && got_off, "audition emits note-on + note-off for the voice note");
-
-    /* One-shot Print: fires exactly one bar (16 step-fires) then stops. */
-    printf("\nPrint fires exactly one bar then stops\n");
-    api->set_param(inst, "pattern", "0");     /* All Hits: every step fires */
+    printf("\nSelecting a pattern auto-splats one bar\n");
+    api->set_param(inst, "auto_print", "1");
     b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
     api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    api->set_param(inst, "print", "1");
-    int fires = 0;
-    for (int c = 1; c <= 240; c++) {           /* well past one 16-step bar */
-        b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-        int n = api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
-        for (int i = 0; i < n; i++)
-            if ((out[i][0] & 0xF0) == 0x90 && out[i][2] > 0) { fires++; break; }
-    }
-    CHECK(fires == 16, "print emits exactly 16 step-fires (one bar) then stops");
-
-    /* play=0 stops the loop. */
-    printf("\nplay=0 stops, play=1 resumes\n");
-    api->set_param(inst, "play", "0");
-    int after_stop = run_bar(api, inst, -1, clk, 64);
-    CHECK(after_stop == 0, "stopped: no fires");
-    api->set_param(inst, "play", "1");
-    int after_play = run_bar(api, inst, -1, clk, 64);
-    CHECK(after_play == 16, "resumed: 16 fires");
+    api->set_param(inst, "pattern", "0");     /* change 1 -> 0 arms the debounce */
+    int nd = run_clocks(api, inst, -1, clk, 64, 160);  /* debounce (~50) then one bar */
+    CHECK(nd == 16, "auto-splat fires exactly one bar after settling");
 
     api->destroy_instance(inst);
-
     if (failures) { printf("\nFAIL: %d check(s) failed\n", failures); return 1; }
     printf("\nOK: sequencer behaves correctly\n");
     return 0;
