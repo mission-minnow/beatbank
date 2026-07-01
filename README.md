@@ -66,9 +66,10 @@ Menu: **Pattern View** · **Globals** · **Swap / None**.
 
 - **Pattern** — a fullscreen grid view with **genre-first** browsing:
   **jog** cycles patterns *within the current genre*, **Knob 1** switches
-  genre (the header shows `GENRE · name · pos/count`). **jog-click / Back**
-  exits. Each voice row shows the note *and the drum-rack pad number* it drives
-  (`p1`…`p16`), so you can see which pad to swap in your sampler (e.g. MrDrums).
+  genre, **Knob 2** sets swing (the header shows `GENRE · name · pos/count`).
+  **jog-click / Back** exits. Each voice row shows the note *and the drum-rack
+  pad number* it drives (`p1`…`p16`), so you can see which pad to swap in your
+  sampler (e.g. MrDrums).
 - **Globals** — **Swing** (delays the off-beat 16ths; deterministic, works on
   any synth — Move's Groove doesn't apply since we bypass its sequencer) and
   **Note Map** (below).
@@ -82,14 +83,15 @@ Twelve voices. The **Note Map** setting chooses which MIDI notes they send:
 - **`gm`** — full General MIDI drum map (Kick 36, Snare 38, Closed Hat 42,
   Open Hat 46, Clap 39, Rim 37, Tom 45, Ride 51, Crash 49, Cowbell 56,
   Conga 63, Perc 70). Use with **SF2 / soundfont** GM kits.
-- **`drumrack`** — everything squeezed into **36–51**, the Move/Ableton
-  drum-rack range that every Schwung drum sampler (MrDrums, Forge, KrautDrums,
-  Libpo32, …) triggers on. Cowbell/Conga/Perc move to free pads (47/48/50).
-  Use with **pad samplers**.
+- **`drumrack`** (default) — everything squeezed into **36–51**, the
+  Move/Ableton drum-rack range that every Schwung drum sampler (MrDrums, Forge,
+  KrautDrums, Libpo32, …) triggers on. Cowbell/Conga/Perc move to free pads
+  (47/48/50). Use with **pad samplers**.
 
-The catalog's drum samplers all trigger on 36–51, *not* the sparse GM range —
-so in `gm` mode Cowbell/Conga/Perc (56/63/70) are silent on them; switch to
-`drumrack` to bring them in range.
+Beat Bank **defaults to `drumrack`** because nearly all the catalog's drum
+samplers trigger on 36–51, *not* the sparse GM range — in `gm` mode
+Cowbell/Conga/Perc (56/63/70) are silent on them. Only switch to `gm` for
+**SF2 / soundfont** GM kits.
 
 ## Build & install
 

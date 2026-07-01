@@ -116,18 +116,18 @@ int main(void)
         if ((out[i][0] & 0xF0) == 0x80 || (out[i][2] == 0)) offs++;
     CHECK(offs >= 1, "stop emits note-off(s)");
 
-    printf("\nNote map: gm (full range) vs drumrack (36-51)\n");
+    printf("\nNote map: drumrack (36-51) default vs gm (full range)\n");
     api->get_param(inst, "note_map", buf, sizeof(buf));
-    CHECK(strcmp(buf, "gm") == 0, "defaults to gm");
+    CHECK(strcmp(buf, "drumrack") == 0, "defaults to drumrack");
+    api->get_param(inst, "cowbell_note", buf, sizeof(buf)); int cb = atoi(buf);
+    api->get_param(inst, "perc_note", buf, sizeof(buf));    int pc = atoi(buf);
+    CHECK(cb == 47 && pc == 50, "drumrack: cowbell/perc in 36-51 (47,50)");
+    api->set_param(inst, "note_map", "gm");
     api->get_param(inst, "cowbell_note", buf, sizeof(buf));
     CHECK(atoi(buf) == 56, "gm: cowbell = 56 (out of 36-51)");
     api->set_param(inst, "note_map", "drumrack");
-    api->get_param(inst, "cowbell_note", buf, sizeof(buf)); int cb = atoi(buf);
-    api->get_param(inst, "perc_note", buf, sizeof(buf));    int pc = atoi(buf);
-    CHECK(cb == 47 && pc == 50, "drumrack: cowbell/perc moved into 36-51 (47,50)");
-    api->set_param(inst, "note_map", "gm");
     api->get_param(inst, "cowbell_note", buf, sizeof(buf));
-    CHECK(atoi(buf) == 56, "switching back to gm restores 56");
+    CHECK(atoi(buf) == 47, "switching back to drumrack restores 47");
 
     printf("\nState round-trips (pattern + swing + note_map)\n");
     api->set_param(inst, "pattern", "1");

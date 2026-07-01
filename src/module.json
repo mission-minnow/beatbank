@@ -32,6 +32,6 @@
     "chain_params": [
         { "key": "pattern", "name": "Pattern", "type": "int", "min": 0, "max": 599, "default": 0, "step": 1 },
         { "key": "swing", "name": "Swing", "type": "int", "min": 0, "max": 100, "default": 0, "step": 1, "unit": "%" },
-        { "key": "note_map", "name": "Note Map", "type": "enum", "options": ["gm", "drumrack"], "default": 0 }
+        { "key": "note_map", "name": "Note Map", "type": "enum", "options": ["gm", "drumrack"], "default": 1 }
     ]
 }

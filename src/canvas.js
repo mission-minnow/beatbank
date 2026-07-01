@@ -4,9 +4,10 @@
  * Genre-first browsing of the (large) library:
  *   - jog turn         -> cycle patterns WITHIN the current genre
  *   - Knob 1 turn      -> switch genre (jumps to that genre's first pattern)
+ *   - Knob 2 turn      -> swing (0..100)
  *   - jog click / Back -> exit (host closes the canvas; the pick is already set)
  *
- * Genre switching is on Knob 1 (an encoder the shadow chain UI owns), not the
+ * Genre/swing are on the knobs (encoders the shadow chain UI owns), not the
  * nav arrows — Move's firmware consumes the arrows for its own sequencer, so
  * they never reach a chain-preview canvas.
  *
@@ -33,10 +34,11 @@ const VOICES = [
 ];
 const NUM_VOICES = VOICES.length;
 
-const CC_JOG = 14, CC_KNOB1 = 71;   /* jog = pattern, knob 1 = genre */
+const CC_JOG = 14, CC_KNOB1 = 71, CC_KNOB2 = 72;   /* jog=pattern K1=genre K2=swing */
+const SWING_STEP = 5;
 
 const g = {
-  count: 1, pattern: 0, steps: 16, name: '', genre: '',
+  count: 1, pattern: 0, steps: 16, name: '', genre: '', swing: 0,
   rows: new Array(NUM_VOICES).fill(''),
   note: new Array(NUM_VOICES).fill(0),
   genres: [],   /* [{name, start, count}] */
@@ -83,6 +85,7 @@ function load(ctx, force) {
     for (let v = 0; v < NUM_VOICES; v++) g.rows[v] = gp(ctx, 'row' + v);
   }
   if (!g.genres.length) g.genres = parseGenres(gp(ctx, 'genre_list'));
+  g.swing = gpi(ctx, 'swing', g.swing);
   for (let v = 0; v < NUM_VOICES; v++) g.note[v] = gpi(ctx, VOICES[v].key, g.note[v]);
 }
 
@@ -106,6 +109,13 @@ function switchGenre(ctx, delta) {
   let gi = (genreIndexOf(g.pattern) + delta) % n;
   if (gi < 0) gi += n;
   setPattern(ctx, g.genres[gi].start);
+}
+
+function setSwing(ctx, delta) {
+  const s = Math.max(0, Math.min(100, g.swing + delta * SWING_STEP));
+  if (s === g.swing) return;
+  g.swing = s;
+  ctx.setParam('swing', String(s));
 }
 
 function padLabel(note) {
@@ -149,7 +159,7 @@ function draw(ctx) {
     }
   }
 
-  ctx.print(0, 57, 'jog:beat   K1:genre', 1);
+  ctx.print(0, 57, 'jog K1:gen K2:sw:' + g.swing, 1);
 }
 
 globalThis.canvas_overlay = {
@@ -164,6 +174,7 @@ globalThis.canvas_overlay = {
     const dir = b2 < 64 ? 1 : -1;
     if (b1 === CC_JOG)   { cyclePattern(ctx, dir); return; }
     if (b1 === CC_KNOB1) { switchGenre(ctx, dir); return; }
+    if (b1 === CC_KNOB2) { setSwing(ctx, dir); return; }
   },
   onClose() {},
   onExit() {},

@@ -181,8 +181,10 @@ static void *bb_create_instance(const char *module_dir, const char *config_json)
     if (!bi) return NULL;
 
     bi->pattern = 0;
-    bi->note_map = 0;
-    for (int v = 0; v < BB_NUM_VOICES; v++) bi->note[v] = kGmNotes[v];
+    /* Default to the 36..51 drum-rack map: most Schwung drum synths use it;
+     * only SF2 wants GM. Users can switch back in Globals -> Note Map. */
+    bi->note_map = 1;
+    for (int v = 0; v < BB_NUM_VOICES; v++) bi->note[v] = kDrumrackNotes[v];
     bi->cur_step = 0;
     bi->clock_running = 0;
     bi->midi_clocks_until_tick = CLOCKS_PER_STEP;
@@ -310,7 +312,8 @@ static void bb_set_param(void *instance, const char *key, const char *val)
         if (bi->cur_step >= pattern_steps(bi)) bi->cur_step = 0;
         bi->preview_revision++;
         bi->swing = (uint8_t)clampi(json_field_int(val, "\"swing\"", bi->swing), 0, 100);
-        apply_note_map(bi, strstr(val, "drumrack") != NULL);
+        /* Only override the map if the blob carries one; else keep the default. */
+        if (strstr(val, "note_map")) apply_note_map(bi, strstr(val, "drumrack") != NULL);
         return;
     }
     for (int v = 0; v < BB_NUM_VOICES; v++)

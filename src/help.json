@@ -36,13 +36,15 @@
         " - jog: cycle beats in",
         "   the current genre",
         " - knob 1: switch genre",
+        " - knob 2: swing",
         "It shows the grid and",
         "the note/pad each drum",
         "drives. Click/Back exit.",
         "Loops when Move plays.",
         "",
         "Globals: Swing + Note",
-        "Map."
+        "Map (also on knob 2 /",
+        "in the Pattern view)."
       ]
     },
     {
@@ -60,6 +62,10 @@
         "  drum-rack range. Use",
         "  with MrDrums and",
         "  other pad samplers.",
+        "",
+        "Default is drumrack",
+        "(most drum synths). Only",
+        "switch to gm for SF2.",
         "",
         "Cowbell/Conga/Perc only",
         "sound in drumrack mode",
