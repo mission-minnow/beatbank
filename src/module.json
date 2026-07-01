@@ -17,7 +17,7 @@
                 "root": {
                     "name": "Beat Bank",
                     "params": [
-                        { "key": "view", "name": "Pattern View", "type": "canvas", "canvas_script": "canvas.js", "show_value": false, "show_footer": false },
+                        { "key": "view", "name": "Pattern", "type": "canvas", "canvas_script": "canvas.js", "show_value": false, "show_footer": false },
                         { "level": "globals", "label": "Globals" }
                     ]
                 },

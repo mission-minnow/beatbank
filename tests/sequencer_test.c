@@ -129,6 +129,20 @@ int main(void)
     api->get_param(inst, "cowbell_note", buf, sizeof(buf));
     CHECK(atoi(buf) == 56, "switching back to gm restores 56");
 
+    printf("\nState round-trips (pattern + swing + note_map)\n");
+    api->set_param(inst, "pattern", "1");
+    api->set_param(inst, "swing", "40");
+    api->set_param(inst, "note_map", "drumrack");
+    char st[128]; api->get_param(inst, "state", st, sizeof(st));
+    void *inst2 = api->create_instance(MODROOT, NULL);   /* fresh, defaults */
+    api->set_param(inst2, "state", st);
+    api->get_param(inst2, "pattern", buf, sizeof(buf));  int rp = atoi(buf);
+    api->get_param(inst2, "swing", buf, sizeof(buf));    int rs = atoi(buf);
+    api->get_param(inst2, "note_map", buf, sizeof(buf));
+    CHECK(rp == 1 && rs == 40 && strcmp(buf, "drumrack") == 0,
+          "restored state matches (pattern 1, swing 40, drumrack)");
+    api->destroy_instance(inst2);
+
     api->destroy_instance(inst);
     if (failures) { printf("\nFAIL: %d check(s) failed\n", failures); return 1; }
     printf("\nOK: sequencer behaves correctly\n");

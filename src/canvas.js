@@ -81,11 +81,14 @@ function draw(ctx) {
   const steps = g.steps;
   const gridX = 44, gridW = 82;
   const cellW = Math.max(2, Math.floor(gridW / steps));
-  const topY = 9;
-  const rowH = Math.min(6, Math.floor((54 - topY) / Math.max(1, used.length)));
+  const topY = 8;
+  /* Row pitch >= 8px keeps a blank line between the 7px-tall labels so p3/p7
+   * etc. stay readable even with rows above and below. */
+  const pitch = Math.min(10, Math.floor(48 / Math.max(1, used.length)));
+  const cellH = Math.max(1, pitch - 3);
 
   for (let r = 0; r < used.length; r++) {
-    const v = used[r], row = g.rows[v], y = topY + r * rowH;
+    const v = used[r], row = g.rows[v], y = topY + r * pitch;
     ctx.print(0, y, VOICES[v].label, 1);
     ctx.print(20, y, padLabel(g.note[v]), 1);   /* note/pad the drum drives */
     for (let s = 0; s < steps && s < row.length; s++) {
@@ -93,9 +96,9 @@ function draw(ctx) {
       if (c === '.') continue;
       const x = gridX + s * cellW, w = Math.max(1, cellW - 1);
       if (c === 'g') {
-        ctx.fillRect(x, y + 2, w, Math.max(1, rowH - 4), 1);
+        ctx.fillRect(x, y + 2, w, Math.max(1, cellH - 2), 1);
       } else {
-        ctx.fillRect(x, y + 1, w, rowH - 2, 1);
+        ctx.fillRect(x, y + 1, w, cellH, 1);
         if (c === 'A') ctx.drawRect(x, y, w, 1, 1);
       }
     }

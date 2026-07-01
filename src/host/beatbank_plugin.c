@@ -262,6 +262,24 @@ static int parse_int(const char *s, int lo, int hi, int dflt)
     return v;
 }
 
+static int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+/* Read the integer after "key": in a small JSON blob (our own state format). */
+static int json_field_int(const char *json, const char *quoted_key, int dflt)
+{
+    const char *p = json ? strstr(json, quoted_key) : NULL;
+    if (!p) return dflt;
+    p = strchr(p + strlen(quoted_key), ':');
+    return p ? atoi(p + 1) : dflt;
+}
+
+static void apply_note_map(BeatBankInstance *bi, int drumrack)
+{
+    bi->note_map = (uint8_t)(drumrack ? 1 : 0);
+    for (int v = 0; v < BB_NUM_VOICES; v++)
+        bi->note[v] = drumrack ? kDrumrackNotes[v] : kGmNotes[v];
+}
+
 static void bb_set_param(void *instance, const char *key, const char *val)
 {
     BeatBankInstance *bi = (BeatBankInstance *)instance;
@@ -283,9 +301,16 @@ static void bb_set_param(void *instance, const char *key, const char *val)
         if (strcmp(val, "gm") == 0)            m = 0;
         else if (strcmp(val, "drumrack") == 0) m = 1;
         else                                   m = (atoi(val) != 0) ? 1 : 0;
-        bi->note_map = (uint8_t)m;
-        for (int v = 0; v < BB_NUM_VOICES; v++)
-            bi->note[v] = m ? kDrumrackNotes[v] : kGmNotes[v];
+        apply_note_map(bi, m);
+        return;
+    }
+    if (strcmp(key, "state") == 0) {          /* chain autosave / patch restore */
+        int hi = g_bank.count > 0 ? g_bank.count - 1 : 0;
+        bi->pattern = clampi(json_field_int(val, "\"pattern\"", bi->pattern), 0, hi);
+        if (bi->cur_step >= pattern_steps(bi)) bi->cur_step = 0;
+        bi->preview_revision++;
+        bi->swing = (uint8_t)clampi(json_field_int(val, "\"swing\"", bi->swing), 0, 100);
+        apply_note_map(bi, strstr(val, "drumrack") != NULL);
         return;
     }
     for (int v = 0; v < BB_NUM_VOICES; v++)
@@ -318,6 +343,9 @@ static int bb_get_param(void *instance, const char *key, char *buf, int buf_len)
     if (strcmp(key, "preview_rev") == 0)   return snprintf(buf, buf_len, "%u", bi->preview_revision);
     if (strcmp(key, "note_map") == 0)      return snprintf(buf, buf_len, "%s", bi->note_map ? "drumrack" : "gm");
     if (strcmp(key, "swing") == 0)         return snprintf(buf, buf_len, "%u", bi->swing);
+    if (strcmp(key, "state") == 0)
+        return snprintf(buf, buf_len, "{\"pattern\":%d,\"swing\":%u,\"note_map\":\"%s\"}",
+                        bi->pattern, bi->swing, bi->note_map ? "drumrack" : "gm");
 
     gi = indexed_key(key, "name");
     if (gi >= 0) { const BeatPattern *q = pattern_at(gi); return snprintf(buf, buf_len, "%s", q ? q->name : ""); }
