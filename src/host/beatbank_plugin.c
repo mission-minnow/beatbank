@@ -37,6 +37,10 @@
 static char g_note_keys[BB_NUM_VOICES][16];
 static const host_api_v1_t *g_host = NULL;
 
+/* Compile-time build stamp, surfaced in the menu (get_param "build") so you can
+ * tell a fresh deploy from a cached binary. Updates whenever this file compiles. */
+static const char BB_BUILD[] = __DATE__ " " __TIME__;
+
 /* Note-map modes (voice order: kick snare ch oh clap rim tom ride crash cowbell conga perc).
  *   gm       — full General MIDI drum map; correct for SF2 / soundfont GM kits.
  *   drumrack — everything squeezed into 36..51, the Move/Ableton drum-rack pad
@@ -382,6 +386,7 @@ static int bb_get_param(void *instance, const char *key, char *buf, int buf_len)
     if (strcmp(key, "preview_rev") == 0)   return snprintf(buf, buf_len, "%u", bi->preview_revision);
     if (strcmp(key, "note_map") == 0)      return snprintf(buf, buf_len, "%s", bi->note_map ? "drumrack" : "gm");
     if (strcmp(key, "swing") == 0)         return snprintf(buf, buf_len, "%u", bi->swing);
+    if (strcmp(key, "build") == 0)         return snprintf(buf, buf_len, "%s", BB_BUILD);
     if (strcmp(key, "state") == 0) {
         int off = snprintf(buf, buf_len,
             "{\"pattern\":%d,\"swing\":%u,\"note_map\":\"%s\",\"notes\":[",

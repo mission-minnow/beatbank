@@ -19,7 +19,8 @@
                     "name": "Beat Bank",
                     "params": [
                         { "key": "view", "name": "Pattern", "type": "canvas", "canvas_script": "canvas.js", "show_value": false, "show_footer": false },
-                        { "level": "globals", "label": "Globals" }
+                        { "level": "globals", "label": "Globals" },
+                        { "key": "build", "name": "Build" }
                     ]
                 },
                 "globals": {
@@ -33,6 +34,7 @@
     "chain_params": [
         { "key": "pattern", "name": "Pattern", "type": "int", "min": 0, "max": 599, "default": 0, "step": 1 },
         { "key": "swing", "name": "Swing", "type": "int", "min": 0, "max": 100, "default": 0, "step": 1, "unit": "%" },
-        { "key": "note_map", "name": "Note Map", "type": "enum", "options": ["gm", "drumrack"], "default": 1 }
+        { "key": "note_map", "name": "Note Map", "type": "enum", "options": ["gm", "drumrack"], "default": 1 },
+        { "key": "build", "name": "Build", "type": "string", "default": "" }
     ]
 }
