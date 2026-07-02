@@ -19,13 +19,12 @@
                     "name": "Beat Bank",
                     "params": [
                         { "key": "view", "name": "Pattern", "type": "canvas", "canvas_script": "canvas.js", "show_value": false, "show_footer": false },
-                        { "level": "globals", "label": "Globals" },
-                        { "key": "build", "name": "Build" }
+                        { "level": "globals", "label": "Globals" }
                     ]
                 },
                 "globals": {
                     "name": "Globals",
-                    "params": ["swing", "note_map"],
+                    "params": ["swing", "note_map", "build"],
                     "knobs": ["swing", "note_map"]
                 }
             }
