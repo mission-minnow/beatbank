@@ -13,9 +13,7 @@
  * It plays straight at Move's tempo — silent unless the transport is running.
  *
  *   0xFA fires step 0 on the downbeat · 0xF8 advances (6 clocks / 16th),
- *   looping · 0xFC stop. The clock logic runs in process_midi but the notes
- *   are emitted in tick() (see OutQueue) so the chain injects them to Move's
- *   track via its tick path — recordings land on the grid, no host change.
+ *   looping · 0xFC stop.
  */
 
 #include "midi_fx_api_v1.h"
@@ -32,22 +30,25 @@
 #define CLOCKS_PER_STEP 6u   /* 24 PPQN / 4 sixteenths */
 #define GATE_CLOCKS     3u   /* note length in clocks (< one step) */
 #define OUT_CHANNEL     0u   /* the chain/slot rewrites the channel on output */
-#define BB_OUT_QUEUE    32   /* pending MIDI out; drained in tick(), not on the clock */
 
-/* Fire the steps AFTER the downbeat this many clocks late so the injected notes
- * reach Move's track *after* the 0xF8 that advances its step — otherwise Move's
- * recorder assigns them to the previous step (one 16th early). Applied once to
- * the first interval → a constant offset (downbeat stays on 0xFA). Deterministic,
- * unlike relying on tick-vs-clock phase. Local off-beats sit 1 clock late. */
+/* Fire the steps AFTER the downbeat this many clocks late so, in Pre mode, the
+ * injected notes reach Move's track *after* the 0xF8 that advances its step —
+ * otherwise Move's recorder assigns them to the previous step (one 16th early).
+ * Applied once to the first interval → a constant offset (downbeat stays on
+ * 0xFA). Emission stays on the clock (process_midi), so it engages instantly at
+ * transport start — unlike tick(), whose render doesn't spin up for ~350ms and
+ * dropped the downbeat. Cost: local off-beats sit 1 clock late; the chain's
+ * inject path (PR #150) delivers them so the recording lands on the grid. */
 #define BB_RECORD_ALIGN_CLOCKS 1u
 
 static char g_note_keys[BB_NUM_VOICES][16];
 static const host_api_v1_t *g_host = NULL;
 
-/* Build stamp surfaced in the menu (get_param "build") so you can tell a fresh
- * deploy from a cached binary. build.sh injects a fresh value every build via
- * -DBB_BUILD_STAMP (git hash + UTC build time), which also busts the Docker
- * compile cache; falls back to the compile timestamp for a plain `make`. */
+/* Build stamp surfaced via get_param "build" (shown in the Pattern canvas
+ * footer) so you can tell a fresh deploy from a cached binary. build.sh injects
+ * a fresh value every build via -DBB_BUILD_STAMP (git hash + UTC build time),
+ * which also busts the Docker compile cache; falls back to the compile
+ * timestamp for a plain `make`. */
 #ifndef BB_BUILD_STAMP
 #define BB_BUILD_STAMP __DATE__ " " __TIME__
 #endif
@@ -71,15 +72,6 @@ typedef struct {
     uint8_t clocks_left;
 } PendingNoteOff;
 
-/* MIDI produced by the clock logic (process_midi) is parked here and emitted in
- * tick(), so the chain routes it through its tick inject path — which reaches
- * Move's native track *after* the 0xF8 advances Move's step, recording on the
- * grid instead of one step early. Also means no chain host change is needed. */
-typedef struct {
-    uint8_t msg[BB_OUT_QUEUE][3];
-    int     count;
-} OutQueue;
-
 typedef struct {
     int     pattern;                 /* selected index into the bank         */
     uint8_t note[BB_NUM_VOICES];     /* output note per voice                */
@@ -92,7 +84,6 @@ typedef struct {
 
     uint32_t preview_revision;
     PendingNoteOff pending[BB_NUM_VOICES];
-    OutQueue outq;
 } BeatBankInstance;
 
 /* ── Bank helpers ────────────────────────────────────────────────────────── */
@@ -127,44 +118,49 @@ static uint8_t clocks_before_step(const BeatBankInstance *bi, uint8_t step)
 
 /* ── MIDI emit (direct into the chain's out buffer) ──────────────────────── */
 
-/* Park one message in the out queue; tick() drains it. */
-static void q_emit(BeatBankInstance *bi, uint8_t status, uint8_t note, uint8_t vel)
+static int emit(uint8_t status, uint8_t note, uint8_t vel,
+                uint8_t out_msgs[][3], int out_lens[], int max_out, int count)
 {
-    if (bi->outq.count >= BB_OUT_QUEUE) return;   /* full: drop (won't happen at one step/tick) */
-    int i = bi->outq.count++;
-    bi->outq.msg[i][0] = status; bi->outq.msg[i][1] = note; bi->outq.msg[i][2] = vel;
+    if (count >= max_out) return count;
+    out_msgs[count][0] = status; out_msgs[count][1] = note; out_msgs[count][2] = vel;
+    out_lens[count] = 3;
+    return count + 1;
 }
 
-static void flush_all(BeatBankInstance *bi)
+static int flush_all(BeatBankInstance *bi, uint8_t out_msgs[][3], int out_lens[], int max_out, int count)
 {
     for (int v = 0; v < BB_NUM_VOICES; v++) {
         if (bi->pending[v].active) {
-            q_emit(bi, (uint8_t)(MIDI_NOTE_OFF | OUT_CHANNEL), bi->pending[v].note, 0);
+            count = emit((uint8_t)(MIDI_NOTE_OFF | OUT_CHANNEL), bi->pending[v].note, 0, out_msgs, out_lens, max_out, count);
             bi->pending[v].active = 0; bi->pending[v].clocks_left = 0;
+            if (count >= max_out) break;
         }
     }
+    return count;
 }
 
-static void advance_pending_clocks(BeatBankInstance *bi)
+static int advance_pending_clocks(BeatBankInstance *bi, uint8_t out_msgs[][3], int out_lens[], int max_out, int count)
 {
     for (int v = 0; v < BB_NUM_VOICES; v++) {
         PendingNoteOff *p = &bi->pending[v];
         if (!p->active) continue;
         if (p->clocks_left > 0) p->clocks_left--;
         if (p->clocks_left == 0) {
-            q_emit(bi, (uint8_t)(MIDI_NOTE_OFF | OUT_CHANNEL), p->note, 0);
+            count = emit((uint8_t)(MIDI_NOTE_OFF | OUT_CHANNEL), p->note, 0, out_msgs, out_lens, max_out, count);
             p->active = 0;
+            if (count >= max_out) break;
         }
     }
+    return count;
 }
 
-static void fire_step(BeatBankInstance *bi)
+static int fire_step(BeatBankInstance *bi, uint8_t out_msgs[][3], int out_lens[], int max_out, int count)
 {
     const BeatPattern *p = pattern_at(bi->pattern);
     uint8_t steps = pattern_steps(bi);
     uint8_t step = bi->cur_step;
 
-    if (!p) return;
+    if (!p) return count;
     if (step >= steps) step = 0;
 
     for (int v = 0; v < BB_NUM_VOICES; v++) {
@@ -172,17 +168,20 @@ static void fire_step(BeatBankInstance *bi)
         PendingNoteOff *pn = &bi->pending[v];
         uint8_t vel;
         if (pn->active) {
-            q_emit(bi, (uint8_t)(MIDI_NOTE_OFF | OUT_CHANNEL), pn->note, 0);
+            count = emit((uint8_t)(MIDI_NOTE_OFF | OUT_CHANNEL), pn->note, 0, out_msgs, out_lens, max_out, count);
             pn->active = 0;
+            if (count >= max_out) return count;
         }
         if (!row[0]) continue;
         if (step >= (uint8_t)strlen(row)) continue;
         vel = bb_char_velocity(row[step]);
         if (vel == 0) continue;
-        q_emit(bi, (uint8_t)(MIDI_NOTE_ON | OUT_CHANNEL), bi->note[v], vel);
+        count = emit((uint8_t)(MIDI_NOTE_ON | OUT_CHANNEL), bi->note[v], vel, out_msgs, out_lens, max_out, count);
+        if (count >= max_out) return count;
         pn->active = 1; pn->note = bi->note[v]; pn->clocks_left = GATE_CLOCKS;
     }
     bi->cur_step = (uint8_t)((step + 1) % steps);
+    return count;
 }
 
 /* ── Lifecycle ───────────────────────────────────────────────────────────── */
@@ -216,46 +215,52 @@ static void *bb_create_instance(const char *module_dir, const char *config_json)
 
 static void bb_destroy_instance(void *instance) { free(instance); }
 
-/* ── MIDI clock processing ───────────────────────────────────────────────────
- * Runs the step/gate logic on Move's clock and PARKS the resulting notes in the
- * out queue. The notes are emitted in bb_tick(), so the chain forwards them via
- * its tick inject path — which reaches Move's native track after the 0xF8 has
- * advanced Move's step, so recordings land on the grid (not one step early),
- * with no chain host change required. Local slot-synth timing is unchanged:
- * tick() runs in the same audio block, and the synth renders per block anyway. */
+/* ── MIDI clock processing (loops the pattern, drives the slot synth) ─────── */
 
 static int bb_process_midi(void *instance, const uint8_t *in_msg, int in_len,
                            uint8_t out_msgs[][3], int out_lens[], int max_out)
 {
     BeatBankInstance *bi = (BeatBankInstance *)instance;
-    (void)out_msgs; (void)out_lens; (void)max_out;   /* output goes out in tick() */
     if (!bi || in_len == 0) return 0;
 
     if (in_msg[0] == 0xFAu) {                     /* Start */
-        flush_all(bi);
+        int count = flush_all(bi, out_msgs, out_lens, max_out, 0);
         bi->cur_step = 0;
         bi->clock_running = 1;
-        fire_step(bi);                            /* downbeat on Start */
+        /* Fire the downbeat ON Start, coincident with Move's transport (its
+         * native tracks do the same). Counting a full step before step 0 put
+         * the whole beat one 16th behind. fire_step advances cur_step, so the
+         * NEXT step is then scheduled a normal interval out. */
+        if (count < max_out)
+            count = fire_step(bi, out_msgs, out_lens, max_out, count);
         bi->midi_clocks_until_tick =
             (uint8_t)(clocks_before_step(bi, bi->cur_step) + BB_RECORD_ALIGN_CLOCKS);
-    } else if (in_msg[0] == 0xFBu) {              /* Continue */
+        return count;
+    }
+    if (in_msg[0] == 0xFBu) {                      /* Continue */
         bi->clock_running = 1;
-    } else if (in_msg[0] == 0xF8u) {              /* Clock tick */
+        return 0;
+    }
+    if (in_msg[0] == 0xF8u) {                      /* Clock tick */
+        int count = 0;
         if (!bi->clock_running) return 0;
-        advance_pending_clocks(bi);
+        count = advance_pending_clocks(bi, out_msgs, out_lens, max_out, count);
+        if (count >= max_out) return count;
         if (bi->midi_clocks_until_tick > 0) bi->midi_clocks_until_tick--;
         if (bi->midi_clocks_until_tick == 0) {
-            fire_step(bi);                        /* loops */
+            count = fire_step(bi, out_msgs, out_lens, max_out, count);   /* loops */
             bi->midi_clocks_until_tick = clocks_before_step(bi, bi->cur_step);
         }
-    } else if (in_msg[0] == 0xFCu) {              /* Stop */
-        bi->clock_running = 0;
-        flush_all(bi);
+        return count;
     }
-    return 0;                                      /* notes emitted in bb_tick() */
+    if (in_msg[0] == 0xFCu) {                      /* Stop */
+        bi->clock_running = 0;
+        return flush_all(bi, out_msgs, out_lens, max_out, 0);
+    }
+    return 0;
 }
 
-/* ── Tick: emit the queued notes; stop cleanly if the clock vanishes ──────── */
+/* ── Tick: stop cleanly if the clock goes away without a 0xFC ────────────── */
 
 static int bb_tick(void *instance, int frames, int sample_rate,
                    uint8_t out_msgs[][3], int out_lens[], int max_out)
@@ -269,27 +274,10 @@ static int bb_tick(void *instance, int frames, int sample_rate,
         if ((status == MOVE_CLOCK_STATUS_STOPPED ||
              status == MOVE_CLOCK_STATUS_UNAVAILABLE) && bi->clock_running) {
             bi->clock_running = 0;
-            flush_all(bi);
+            return flush_all(bi, out_msgs, out_lens, max_out, 0);
         }
     }
-
-    /* Drain the queue built since the last tick. If it somehow overran max_out,
-     * keep the remainder for the next tick (shift down) rather than dropping. */
-    int n = bi->outq.count < max_out ? bi->outq.count : max_out;
-    for (int i = 0; i < n; i++) {
-        out_msgs[i][0] = bi->outq.msg[i][0];
-        out_msgs[i][1] = bi->outq.msg[i][1];
-        out_msgs[i][2] = bi->outq.msg[i][2];
-        out_lens[i] = 3;
-    }
-    int rem = bi->outq.count - n;
-    for (int i = 0; i < rem; i++) {
-        bi->outq.msg[i][0] = bi->outq.msg[n + i][0];
-        bi->outq.msg[i][1] = bi->outq.msg[n + i][1];
-        bi->outq.msg[i][2] = bi->outq.msg[n + i][2];
-    }
-    bi->outq.count = rem;
-    return n;
+    return 0;
 }
 
 /* ── Parameter I/O ───────────────────────────────────────────────────────── */

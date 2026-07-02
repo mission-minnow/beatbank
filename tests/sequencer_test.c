@@ -44,32 +44,27 @@ static void write_test_patterns(void)
     fclose(fp);
 }
 
-/* process_midi() parks notes on the clock; tick() emits them. Feed a clock,
- * then drain tick() and record the clock number of the first note-on matching
- * match (<0 = any). Same-frame drain preserves the clock timing: step 0 on the
- * 0xFA (clock 0), step k on clock 6k. */
-static int drain_tick(midi_fx_api_v1_t *api, void *inst, int match, int *clk, int *count, int maxc, int c)
-{
-    uint8_t out[MIDI_FX_MAX_OUT_MSGS][3];
-    int lens[MIDI_FX_MAX_OUT_MSGS];
-    int n = api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    for (int i = 0; i < n; i++)
-        if ((out[i][0] & 0xF0) == 0x90 && out[i][2] > 0 && (match < 0 || out[i][1] == match)) {
-            if (*count < maxc) clk[*count] = c; (*count)++; return 1;
-        }
-    return 0;
-}
-
+/* Send 0xFA (start), then nclocks of 0xF8; record the clock number of each
+ * note-on matching match_note (<0 = any) from process_midi's output. Step 0
+ * fires on the Start message itself (the downbeat), recorded as clock 0. */
 static int run_bar(midi_fx_api_v1_t *api, void *inst, int match, int *clk, int maxc, int nclocks)
 {
     uint8_t out[MIDI_FX_MAX_OUT_MSGS][3];
     int lens[MIDI_FX_MAX_OUT_MSGS];
     uint8_t b; int count = 0;
-    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    drain_tick(api, inst, match, clk, &count, maxc, 0);
+    b = 0xFA;
+    int n0 = api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
+    for (int i = 0; i < n0; i++)
+        if ((out[i][0] & 0xF0) == 0x90 && out[i][2] > 0 && (match < 0 || out[i][1] == match)) {
+            if (count < maxc) clk[count] = 0; count++; break;
+        }
     for (int c = 1; c <= nclocks; c++) {
-        b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-        drain_tick(api, inst, match, clk, &count, maxc, c);
+        b = 0xF8;
+        int n = api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
+        for (int i = 0; i < n; i++)
+            if ((out[i][0] & 0xF0) == 0x90 && out[i][2] > 0 && (match < 0 || out[i][1] == match)) {
+                if (count < maxc) clk[count] = c; count++; break;
+            }
     }
     return count;
 }
@@ -126,12 +121,10 @@ int main(void)
 
     printf("\nStop flushes held notes\n");
     api->set_param(inst, "pattern", "0");     /* All Hits: step 0 always has notes */
-    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);   /* emit step 0 note-ons (held) */
-    b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
-    api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);   /* 1 clock < gate: still held */
-    b = 0xFC; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS); /* queues note-offs */
-    int fn = api->tick(inst, 128, 44100, out, lens, MIDI_FX_MAX_OUT_MSGS);      /* emit them */
+    b = 0xFA; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS); /* step 0 fires on Start, held */
+    b = 0xF8; api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS); /* 1 clock < gate: still held */
+    b = 0xFC;
+    int fn = api->process_midi(inst, &b, 1, out, lens, MIDI_FX_MAX_OUT_MSGS);
     int offs = 0;
     for (int i = 0; i < fn; i++)
         if ((out[i][0] & 0xF0) == 0x80 || (out[i][2] == 0)) offs++;
