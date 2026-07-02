@@ -45,20 +45,12 @@ const SWING_STEP = 5;
 
 const g = {
   count: 1, pattern: 0, steps: 16, name: '', genre: '', swing: 0,
-  drumrack: true, build: '',
+  drumrack: true,
   rows: new Array(NUM_VOICES).fill(''),
   note: new Array(NUM_VOICES).fill(0),
   genres: [],   /* [{name, start, count}] */
   rev: -1,
 };
-
-/* Compact build tag for the footer: "<hash> HHMM" from "<hash>@YYYYMMDDTHHMMSSZ". */
-function buildTag() {
-  const b = g.build || '';
-  const at = b.indexOf('@'), t = b.indexOf('T');
-  if (at > 0 && t > at) return b.slice(0, at) + ' ' + b.slice(t + 1, t + 5);
-  return b;
-}
 
 function gp(ctx, k) { const v = ctx.getParam(k); return v === undefined || v === null ? '' : v; }
 function gpi(ctx, k, d) { const v = parseInt(gp(ctx, k), 10); return Number.isFinite(v) ? v : d; }
@@ -102,7 +94,6 @@ function load(ctx, force) {
   if (!g.genres.length) g.genres = parseGenres(gp(ctx, 'genre_list'));
   g.swing = gpi(ctx, 'swing', g.swing);
   g.drumrack = gp(ctx, 'note_map') !== 'gm';
-  if (!g.build) g.build = gp(ctx, 'build');
   for (let v = 0; v < NUM_VOICES; v++) g.note[v] = gpi(ctx, VOICES[v].key, g.note[v]);
 }
 
@@ -195,7 +186,7 @@ function draw(ctx) {
     }
   }
 
-  ctx.print(0, 57, 'sw:' + g.swing + ' ' + buildTag(), 1);
+  ctx.print(0, 57, 'K7 sw:' + g.swing + '  K8 genre', 1);
 }
 
 globalThis.canvas_overlay = {

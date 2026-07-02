@@ -24,7 +24,7 @@
                 },
                 "globals": {
                     "name": "Globals",
-                    "params": ["swing", "note_map"],
+                    "params": ["swing", "note_map", { "key": "build", "name": "Build", "type": "string" }],
                     "knobs": ["swing", "note_map"]
                 }
             }
