@@ -77,4 +77,10 @@ Not full cross-product — the axes most likely to expose inconsistency:
 - **Real fix location:** the +1 must apply to the **inject path only**, so local slot-synth timing stays tight. Beat Bank can't do that (it emits one stream to both synth + inject and can't see Pre mode), so the `+1` diagnostic is **not for shipping** — it adds ~1 clock of local off-beat lateness.
 - **Fix → chain/shim (Charles):** in Pre mode, deliver injected MIDI one clock later / after Move's clock-advance, while the synth send stays immediate. Extends PR #150. Candidate: a one-tick inject delay in the chain's Pre-mode inject block (leaves the synth path untouched).
 
+**RESOLVED — tick-based emission (`tick-based-sequencer` branch):** Beat Bank now runs the clock logic in `process_midi` but **emits the notes in `tick()`**, so the chain routes them through its **tick inject path** (which reaches Move after the `0xF8` advance). Result on hardware: **Case 1 records on the grid (no −1) and local timing is perfect.**
+- **No host change needed:** the tick inject path already ships in released schwung (it's how arp reaches Move) → **PR #150 is unnecessary for us.** Zero blast radius on other modules; the whole fix is in our module.
+- This supersedes the chain/shim fix above and the `+1`-clock diagnostic.
+- **To 100%-confirm "no host change":** run once against a *stock* chain (revert `chain_midi.c` in schwung) — logically it must work since the tick path is untouched by #150.
+- **Still to check:** cases 2–4 on the tick build (consistency), then merge `tick-based-sequencer` (+ `pre_capable`) to main as v0.2.
+
 **Move routing note (learned):** a track's **MIDI In copies MIDI from the source channel regardless of the source channel's MIDI-Out setting** — Track 2 pulled from channel 1 even with channel 1's MIDI Out off. So injection reaches the target track via Move's internal track-MIDI copy, not the MIDI-Out. (Affects how "Recv Ch → target track" is wired in setup.)
