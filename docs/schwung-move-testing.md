@@ -88,14 +88,21 @@ hit) sit undrained, then dump late in a bunch — **zero `tick()` calls from t+0
 t+359 ms, queue growing 2→4→5, one drain.** Emitting in `tick()` couples output
 to the render rate, which is unreliable at startup.
 
-**CURRENT — on-clock emission + record-align + PR #150 (reopened):** back to
-emitting in `process_midi` (the clock is solid from t+0), with a **+1-clock
-record-align** on the first interval so injected notes land after Move's
-step-advance (the proven `inject-advance-diagnostic` behavior). Injection needs
-the chain's `on_midi` inject path → **[PR #150](https://github.com/charlesvestal/schwung/pull/150) is required after all** (reopened). Cost:
-local off-beats sit ~1 clock late; if that matters, move the delay into the chain
-(inject-only) so the synth stays tight.
-- **Still to check on the on-clock + #150 build:** re-run Case 1 (downbeat now
-  captured, no startup rush), then cases 2–4.
+**INTERIM — on-clock emission + module-side record-align:** briefly shipped a
+**+1-clock record-align inside Beat Bank** (first interval). It fixed recording
+but shifted the *whole* note stream, so the local slot synth dragged a constant
+~1 clock (~31 ms at 80 bpm) — very audible on 1/8th hats. Wrong place for the
+delay: it can't tell the synth send from the inject.
+
+**CURRENT — tight on-clock emission + inject-only record-align in the chain
+(PR #150):** Beat Bank emits step 0 on `0xFA` and every step on its clock,
+period — the synth send is sample-tight. The record-align moved into the chain's
+Pre-mode inject path as a **1-clock inject-only delay**
+([PR #150](https://github.com/charlesvestal/schwung/pull/150)): clock-driven
+output is buffered and injected on the next clock (downbeat on `0xFA` and Stop
+inject immediately), so it reaches Move after the step-advance and records on the
+grid — without touching local timing. Best of both.
+- **Still to check on this build:** local play tight at 80 bpm (no hat drift);
+  Case 1 records on the grid with the downbeat captured; then cases 2–4.
 
 **Move routing note (learned):** a track's **MIDI In copies MIDI from the source channel regardless of the source channel's MIDI-Out setting** — Track 2 pulled from channel 1 even with channel 1's MIDI Out off. So injection reaches the target track via Move's internal track-MIDI copy, not the MIDI-Out. (Affects how "Recv Ch → target track" is wired in setup.)
