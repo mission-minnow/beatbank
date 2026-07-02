@@ -66,9 +66,11 @@ Not full cross-product — the axes most likely to expose inconsistency:
 - **Model:** step 0 fires on `0xFA` (transport start) → recorded at Move's step 0. Every later step k fires on the same `0xF8` that advances Move to step k, but the injected note is recorded against Move's **current** step (k−1) *before* the clock advances → −1. Local slot-synth audio was tight (earlier test), so generation is on time; this is an **inject-delivery vs Move-clock-advance ordering** issue in the record path, not our sequencer.
 - **TODO confirm:** does T2 sound tight *live* (only the recording is off)? Record-quantize on/off?
 
-**Case 1 re-run @ 200 bpm (was 90):**
-- **Shift is identical at both tempos** → it's a fixed **step/grid** offset, *not* a fixed-time latency (rules out ms-delivery-delay causes).
-- Refined observation: "**the second hit is early; everything else on time.**" This partly conflicts with the earlier `ch` read (which looked like *all* post-downbeat hats shifted). **Need a clean re-read** to settle "only the 2nd note" vs "everything after the downbeat" — the fix differs.
-  - **Next:** record a 4-on-the-floor kick (steps 0,4,8,12) and note exact recorded steps. `only-2nd-early → {0,3,8,12}`; `all-after-1st-early → {0,3,7,11}`.
+**Case 1 re-run @ 200 bpm (was 90) — CONFIRMED:**
+- **Downbeat lands on step 0; every step after it is −1 (early). Identical at 90 and 200 bpm.**
+- Tempo-independence → fixed **step/grid** offset, *not* a ms delivery latency.
+- **Mechanism (settled):** step 0 fires on `0xFA` (transport start) — Move is already at step 0, records it there. Step k (k≥1) fires on the `0xF8` that advances Move to step k, but Move records the injected note against its **current** step (k−1) *before* the clock advances → −1. Downbeat is the exception because there's no advance at the start.
+- **Where the fix lives:** the inject-delivery/record-order in the shim (or chain buffering one clock), **not** our sequencer — local generation is tight (verified). A single fire time can't satisfy both local audio (wants step k on clock 6k) and Move-record (wants the inject to arrive *after* the step-k advance); the inject must be delivered post-advance. → raise with Charles as a general Pre-mode-generator recording issue.
+- **Note:** the anchored-downbeat asymmetry means a manual "shift clip +1" cleanup in Move doesn't work (it'd move the correct downbeat off).
 
 **Move routing note (learned):** a track's **MIDI In copies MIDI from the source channel regardless of the source channel's MIDI-Out setting** — Track 2 pulled from channel 1 even with channel 1's MIDI Out off. So injection reaches the target track via Move's internal track-MIDI copy, not the MIDI-Out. (Affects how "Recv Ch → target track" is wired in setup.)
