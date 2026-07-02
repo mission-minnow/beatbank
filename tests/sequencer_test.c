@@ -84,40 +84,36 @@ int main(void)
 
     api->set_param(inst, "pattern", "0");     /* All Hits: every step fires */
 
-    /* Steps after the downbeat fire BB_RECORD_ALIGN_CLOCKS late (record-align).
-     * Keep in sync with the plugin. Downbeat stays on the 0xFA (clock 0). */
-    const int RA = 1;
-
-    printf("\nStraight 16ths: downbeat on 0xFA, off-beats +%d (record-align)\n", RA);
-    int ns = run_bar(api, inst, -1, clk, 64, 90 + RA);
+    printf("\nStraight 16ths: step 0 on the downbeat, then every 6 clocks\n");
+    int ns = run_bar(api, inst, -1, clk, 64, 90);
     CHECK(ns == 16, "16 step-fires in one bar");
-    CHECK(ns >= 3 && clk[0] == 0 && clk[1] == 6 + RA && clk[2] == 12 + RA,
-          "step 0 on Start (0), off-beats +RA");
-    CHECK(ns == 16 && clk[15] == 90 + RA, "step 15 at clock 90+RA");
+    CHECK(ns >= 3 && clk[0] == 0 && clk[1] == 6 && clk[2] == 12,
+          "step 0 on Start (clock 0), then 6,12...");
+    CHECK(ns == 16 && clk[15] == 90, "step 15 at clock 90");
 
     printf("\nKick lands on the four beats\n");
-    int nk = run_bar(api, inst, 36, clk, 64, 90 + RA);
-    CHECK(nk == 4 && clk[0] == 0 && clk[1] == 24 + RA && clk[2] == 48 + RA && clk[3] == 72 + RA,
-          "kick at 0, 24+RA, 48+RA, 72+RA");
+    int nk = run_bar(api, inst, 36, clk, 64, 90);
+    CHECK(nk == 4 && clk[0] == 0 && clk[1] == 24 && clk[2] == 48 && clk[3] == 72,
+          "kick at clocks 0,24,48,72 (beats 1-4)");
 
     printf("\nLoops continuously (two bars = 32 fires)\n");
-    int n2 = run_bar(api, inst, -1, clk, 64, 186 + RA);
+    int n2 = run_bar(api, inst, -1, clk, 64, 186);
     CHECK(n2 == 32, "32 step-fires across two bars");
-    CHECK(n2 == 32 && clk[16] == 96 + RA, "bar 2 downbeat at clock 96+RA");
+    CHECK(n2 == 32 && clk[16] == 96, "bar 2 downbeat at clock 96");
 
     printf("\nSwing delays the off-beat 16ths\n");
     api->set_param(inst, "swing", "100");
-    int sw = run_bar(api, inst, -1, clk, 64, 95 + RA);
+    int sw = run_bar(api, inst, -1, clk, 64, 95);
     CHECK(sw == 16, "swing keeps 16 fires");
-    CHECK(sw >= 4 && clk[0] == 0 && clk[1] == 8 + RA && clk[2] == 12 + RA && clk[3] == 20 + RA,
-          "downbeat on grid, off-beats swung late (+RA)");
-    CHECK(sw == 16 && clk[15] == 92 + RA, "last off-beat 16th at clock 92+RA");
+    CHECK(sw >= 4 && clk[0] == 0 && clk[1] == 8 && clk[2] == 12 && clk[3] == 20,
+          "downbeat on grid, off-beats swung late (0,8,12,20)");
+    CHECK(sw == 16 && clk[15] == 92, "last off-beat 16th at clock 92");
     api->set_param(inst, "swing", "0");
 
     printf("\nPattern switch -> snare backbeat\n");
     api->set_param(inst, "pattern", "1");
-    int nsn = run_bar(api, inst, 38, clk, 64, 90 + RA);
-    CHECK(nsn == 2 && clk[0] == 24 + RA && clk[1] == 72 + RA, "snare at 24+RA, 72+RA (beats 2 & 4)");
+    int nsn = run_bar(api, inst, 38, clk, 64, 90);
+    CHECK(nsn == 2 && clk[0] == 24 && clk[1] == 72, "snare at clocks 24,72 (beats 2 & 4)");
 
     printf("\nStop flushes held notes\n");
     api->set_param(inst, "pattern", "0");     /* All Hits: step 0 always has notes */

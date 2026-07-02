@@ -31,15 +31,11 @@
 #define GATE_CLOCKS     3u   /* note length in clocks (< one step) */
 #define OUT_CHANNEL     0u   /* the chain/slot rewrites the channel on output */
 
-/* Fire the steps AFTER the downbeat this many clocks late so, in Pre mode, the
- * injected notes reach Move's track *after* the 0xF8 that advances its step —
- * otherwise Move's recorder assigns them to the previous step (one 16th early).
- * Applied once to the first interval → a constant offset (downbeat stays on
- * 0xFA). Emission stays on the clock (process_midi), so it engages instantly at
- * transport start — unlike tick(), whose render doesn't spin up for ~350ms and
- * dropped the downbeat. Cost: local off-beats sit 1 clock late; the chain's
- * inject path (PR #150) delivers them so the recording lands on the grid. */
-#define BB_RECORD_ALIGN_CLOCKS 1u
+/* Emission is tight on the clock: step 0 on 0xFA, then every CLOCKS_PER_STEP.
+ * The recording-alignment delay (injected notes must land AFTER Move's step
+ * advance, else recorded one 16th early) lives in the chain's Pre-mode inject
+ * path (a 1-clock inject-only delay), NOT here — so the local slot-synth send
+ * stays sample-tight while only the Move inject is delayed. See PR #150. */
 
 static char g_note_keys[BB_NUM_VOICES][16];
 static const host_api_v1_t *g_host = NULL;
@@ -233,8 +229,7 @@ static int bb_process_midi(void *instance, const uint8_t *in_msg, int in_len,
          * NEXT step is then scheduled a normal interval out. */
         if (count < max_out)
             count = fire_step(bi, out_msgs, out_lens, max_out, count);
-        bi->midi_clocks_until_tick =
-            (uint8_t)(clocks_before_step(bi, bi->cur_step) + BB_RECORD_ALIGN_CLOCKS);
+        bi->midi_clocks_until_tick = clocks_before_step(bi, bi->cur_step);
         return count;
     }
     if (in_msg[0] == 0xFBu) {                      /* Continue */
