@@ -34,6 +34,13 @@
 #define OUT_CHANNEL     0u   /* the chain/slot rewrites the channel on output */
 #define BB_OUT_QUEUE    32   /* pending MIDI out; drained in tick(), not on the clock */
 
+/* Fire the steps AFTER the downbeat this many clocks late so the injected notes
+ * reach Move's track *after* the 0xF8 that advances its step — otherwise Move's
+ * recorder assigns them to the previous step (one 16th early). Applied once to
+ * the first interval → a constant offset (downbeat stays on 0xFA). Deterministic,
+ * unlike relying on tick-vs-clock phase. Local off-beats sit 1 clock late. */
+#define BB_RECORD_ALIGN_CLOCKS 1u
+
 static char g_note_keys[BB_NUM_VOICES][16];
 static const host_api_v1_t *g_host = NULL;
 
@@ -229,7 +236,8 @@ static int bb_process_midi(void *instance, const uint8_t *in_msg, int in_len,
         bi->cur_step = 0;
         bi->clock_running = 1;
         fire_step(bi);                            /* downbeat on Start */
-        bi->midi_clocks_until_tick = clocks_before_step(bi, bi->cur_step);
+        bi->midi_clocks_until_tick =
+            (uint8_t)(clocks_before_step(bi, bi->cur_step) + BB_RECORD_ALIGN_CLOCKS);
     } else if (in_msg[0] == 0xFBu) {              /* Continue */
         bi->clock_running = 1;
     } else if (in_msg[0] == 0xF8u) {              /* Clock tick */
