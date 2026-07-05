@@ -15,13 +15,6 @@ CC_CROSS   := aarch64-linux-gnu-gcc
 CFLAGS     := -std=c99 -Wall -Wextra -O2 -fPIC \
               -Isrc/dsp -Isrc/host
 
-# Build stamp injected by build.sh (git hash + UTC time). Empty for a plain
-# `make` → the plugin falls back to the compile timestamp.
-BB_BUILD_STAMP ?=
-ifneq ($(strip $(BB_BUILD_STAMP)),)
-CFLAGS += -DBB_BUILD_STAMP='"$(BB_BUILD_STAMP)"'
-endif
-
 DSP_SRCS   := src/dsp/patterns.c
 HOST_SRCS  := src/host/beatbank_plugin.c
 ALL_SRCS   := $(DSP_SRCS) $(HOST_SRCS)

@@ -10,9 +10,9 @@ RUN apt-get update && \
 WORKDIR /build
 COPY . .
 
-# A fresh BUILD_STAMP each build invalidates this layer, so the plugin always
-# recompiles with the current stamp (rm -f forces the rebuild inside the layer).
-ARG BUILD_STAMP=
-RUN rm -f build/aarch64/dsp.so && make aarch64 BB_BUILD_STAMP="$BUILD_STAMP"
+# rm -f before make forces a clean compile inside the layer — belt-and-suspenders
+# with .dockerignore excluding build/, so a stale host dsp.so can never satisfy
+# make and ship as the release binary.
+RUN rm -f build/aarch64/dsp.so && make aarch64
 
 # Output: build/aarch64/dsp.so

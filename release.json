@@ -1,7 +1,7 @@
 {
     "id": "beatbank",
     "name": "Beat Bank",
-    "description": "Library of standard drum patterns (lofi, dnb, bossa, house, techno) \u2014 no randomness, just load and play.",
+    "description": "Library of standard drum patterns (lofi, dnb, bossa, house, techno) — no randomness, just load and play.",
     "component_type": "midi_fx",
     "version": "0.1.0",
     "download_url": "https://github.com/mission-minnow/beatbank/releases/download/v0.1.0/beatbank-module.tar.gz"

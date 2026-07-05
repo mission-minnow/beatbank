@@ -13,18 +13,9 @@ cd "$(dirname "$0")/.."
 
 MODE="${1:-auto}"
 
-# Fresh build stamp: <git-short>[+dirty]@<UTC>. Changes every build so a
-# deployed binary is always identifiable (and it busts the Docker compile cache).
-HASH="$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"
-if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
-    HASH="${HASH}+"
-fi
-BUILD_STAMP="${HASH}@$(date -u +%Y%m%dT%H%M%SZ)"
-echo "→ Build stamp: ${BUILD_STAMP}"
-
 build_docker() {
     echo "→ Building with Docker..."
-    docker build -f scripts/Dockerfile --build-arg BUILD_STAMP="${BUILD_STAMP}" -t beatbank-builder .
+    docker build -f scripts/Dockerfile -t beatbank-builder .
     mkdir -p build/aarch64
     docker run --rm -v "$(pwd)/build/aarch64:/out" beatbank-builder \
         cp /build/build/aarch64/dsp.so /out/dsp.so
@@ -45,7 +36,7 @@ build_native() {
         exit 1
     fi
     rm -f build/aarch64/dsp.so
-    make aarch64 CC_CROSS="$CC_CROSS" BB_BUILD_STAMP="$BUILD_STAMP"
+    make aarch64 CC_CROSS="$CC_CROSS"
     echo "✓ build/aarch64/dsp.so"
 }
 

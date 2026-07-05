@@ -2,7 +2,7 @@
     "id": "beatbank",
     "name": "Beat Bank",
     "abbrev": "BANK",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Library of standard drum patterns from editable .beat files — pick a pattern, it prints one bar into Move.",
     "author": "Schwung Move",
     "api_version": 2,
@@ -24,7 +24,7 @@
                 },
                 "globals": {
                     "name": "Globals",
-                    "params": ["swing", "note_map", { "key": "build", "name": "Build", "type": "string" }],
+                    "params": ["swing", "note_map"],
                     "knobs": ["swing", "note_map"]
                 }
             }
