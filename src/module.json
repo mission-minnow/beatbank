@@ -2,7 +2,7 @@
     "id": "beatbank",
     "name": "Beat Bank",
     "abbrev": "BANK",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Library of standard drum patterns from editable .beat files — pick a pattern, it prints one bar into Move.",
     "author": "Schwung Move",
     "api_version": 2,

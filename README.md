@@ -42,8 +42,8 @@ Bank sends by default.
 4. **MIDI FX → Beat Bank.**
 5. Open Beat Bank → **Pattern**, then **press Play** on the Move. You'll hear the
    beat playing through your kit. 🎉
-6. **Turn the jog** to audition patterns in the current genre; **Knob 8** hops to
-   another genre.
+6. **Turn the jog** to audition patterns in the current genre; **Shift + jog**
+   (or **Knob 8**) hops to another genre.
 7. **Turn Knobs 1–6** to move each drum voice onto a different pad in your kit —
    live, while the loop plays. No trips into the sampler.
 8. **Knob 7** adds swing. When it sounds right, **record it** with the Quantized
@@ -98,7 +98,7 @@ A fullscreen grid. Genre-first browsing on the jog, live sound design on the kno
 │ 3 OH  p11 ..x...x...x...x.            │
 │ 4 CLP p4  ....x.......x...            │
 │                                       │
-│ K7 sw:0            K8 genre           │
+│ sw:0          sh+jog=genre           │
 └──────────────────────────────────────┘
 ```
 
@@ -116,9 +116,10 @@ loaded kit without guessing.
 | Control            | Action                                                            |
 | ------------------ | ----------------------------------------------------------------- |
 | **Jog** turn       | Browse patterns *within* the current genre                        |
+| **Shift + jog**    | Switch genre — detented, one click per genre (24 genres)          |
 | **Knobs 1–6**      | Move each voice (row 1–6) to a different **pad / note** — live     |
 | **Knob 7**         | Swing (0–100)                                                     |
-| **Knob 8**         | Switch genre                                                      |
+| **Knob 8**         | Switch genre (same as Shift + jog, if you prefer the knob)        |
 | **Jog-click / Back** | Exit the Pattern view                                           |
 
 **Positional pads.** Knob 1 always edits the top row, Knob 2 the next, and so on.
@@ -161,8 +162,8 @@ switch to `gm` for SF2-style kits that expect the sparse General MIDI notes.
 > **Band** — funk *(Funky Drummer, Cold Sweat, Purdie shuffle…)* · soul / Motown · rock / pop · gospel · country
 > **World** — bossa nova · samba · Latin · Afrobeat · reggae / dub · calypso
 
-Browse **genre-first**: the jog cycles patterns inside a genre; Knob 8 jumps
-between genres. Named grooves (Funky Drummer, Amen, Think, claves, Purdie/Rosanna
+Browse **genre-first**: the jog cycles patterns inside a genre; **Shift + jog**
+(or Knob 8) jumps between genres. Named grooves (Funky Drummer, Amen, Think, claves, Purdie/Rosanna
 shuffles…) are quantized to the 16th grid — recognizable placements rather than
 exact swung transcriptions.
 
