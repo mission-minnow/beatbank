@@ -38,16 +38,10 @@ const VOICES = [
 const NUM_VOICES = VOICES.length;
 
 const CC_JOG = 14;
-const CC_SHIFT = 49;                    /* Shift held: shift+jog = genre */
 const CC_PAD_LO = 71, CC_PAD_HI = 76;  /* K1..K6 = positional pad/note selectors */
 const CC_SWING = 77;                    /* K7 = swing */
-const CC_GENRE = 78;                    /* K8 = genre (also shift+jog) */
+const CC_GENRE = 78;                    /* K8 = genre */
 const SWING_STEP = 5;
-
-/* Shift state, tracked from CC 49 (the canvas gets it raw). Jog alone browses
- * patterns; shift+jog steps genres — detented, so one click = one genre, which
- * feels far less twitchy than the continuous Knob 8. */
-let shiftHeld = false;
 
 const g = {
   count: 1, pattern: 0, steps: 16, name: '', genre: '', swing: 0,
@@ -161,8 +155,7 @@ function draw(ctx) {
   const ge = g.genres[gi] || { name: g.genre, start: 0, count: g.count };
   const pos = (g.pattern - ge.start) + 1;
 
-  ctx.print(0, 0, (ge.name || '').slice(0, 7), 1);
-  ctx.print(44, 0, (g.name || '').slice(0, 8), 1);
+  ctx.print(0, 0, (g.name || '').slice(0, 16), 1);   /* pattern name — full top row now */
   ctx.print(96, 0, pos + '/' + ge.count, 1);
 
   const used = usedVoices();
@@ -192,23 +185,20 @@ function draw(ctx) {
     }
   }
 
-  ctx.print(0, 57, 'sw:' + g.swing + '  sh+jog=genre', 1);
+  ctx.print(0, 57, 'sw:' + g.swing + '  K8: ' + (ge.name || '').slice(0, 12), 1);
 }
 
 globalThis.canvas_overlay = {
-  onOpen(ctx) { shiftHeld = false; g.genres = []; load(ctx, true); },
+  onOpen(ctx) { g.genres = []; load(ctx, true); },
   tick(ctx) { load(ctx, false); },
   draw(ctx) { draw(ctx); return true; },
   onMidi(ctx, payload) {
     const d = payload && payload.data;
     if (!d || d.length < 3) return;
     const type = d[0] & 0xF0, b1 = d[1], b2 = d[2];
-    /* Track Shift before the encoder filter (release is b2 == 0, which the
-     * filter below drops). */
-    if (type === 0xB0 && b1 === CC_SHIFT) { shiftHeld = b2 > 0; return; }
     if (type !== 0xB0 || b2 === 0) return;   /* encoders: 1..63 = +, 64..127 = - */
     const dir = b2 < 64 ? 1 : -1;
-    if (b1 === CC_JOG)   { (shiftHeld ? switchGenre : cyclePattern)(ctx, dir); return; }
+    if (b1 === CC_JOG)   { cyclePattern(ctx, dir); return; }
     if (b1 === CC_GENRE) { switchGenre(ctx, dir); return; }
     if (b1 === CC_SWING) { setSwing(ctx, dir); return; }
     if (b1 >= CC_PAD_LO && b1 <= CC_PAD_HI) {
