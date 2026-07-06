@@ -53,6 +53,39 @@ That's the whole loop: **pick a beat → match it to your kit → capture it.**
 
 ---
 
+## 🎹 Record beats into Move (build a kit)
+
+Besides the WAV sampler, Beat Bank can play its patterns **straight into a Move
+track as MIDI** — so you can print a different beat onto each pad/clip and build up
+a kit. This uses Beat Bank's **Schw+Move** (Pre) mode, which injects the beat into
+the track just like live playing.
+
+1. In the slot's **MIDI FX** settings, set Beat Bank to **Schw+Move** (Pre).
+2. Aim it at the track you want by setting the slot's **Recv Ch** to that track's
+   channel (Move's default is Track *N* ↔ channel *N*), and make sure that
+   **track's MIDI In is On**.
+3. **Press Play.** The beat plays *through the track's own kit*, so you hear
+   exactly what you'll capture — **this is your audition; nothing is recorded until
+   you arm.**
+4. **Arm the pad/track and record** (before or after pressing Play) to print the
+   current beat. Then pick another beat, arm the next pad, record — one beat per
+   pad.
+
+### 🔇 Play back cleanly (silence Beat Bank)
+
+Beat Bank only reaches the track **through that track's MIDI In**, so one switch
+silences it: **set the track's MIDI In to Off.** Now Play plays only your recorded
+clips — Beat Bank injects nothing on top. Flip MIDI In back **On** whenever you
+want to print more beats.
+
+> **Re-record a pad:** delete the pad's clip, set MIDI In **On**, pick a beat, and
+> record again. The pad itself is the audition — print it, listen, keep or redo.
+
+> ℹ️ Needs a Schwung build with **Schw+Move / Pre-mode inject**. If the MIDI FX
+> mode only shows **Schw** (no **Schw+Move**), update Schwung first.
+
+---
+
 ## 🎛 The Pattern view
 
 A fullscreen grid. Genre-first browsing on the jog, live sound design on the knobs.
