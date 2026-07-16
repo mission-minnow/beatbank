@@ -3,6 +3,8 @@
  *
  * Genre-first browsing of the (large) library:
  *   - jog turn         -> cycle patterns WITHIN the current genre
+ *   - Shift + jog turn -> switch genre (needs ctx.shiftHeld(); falls back to
+ *                         plain pattern-cycle on a host without it)
  *   - Knobs 1-6 turn   -> change each voice's pad (drumrack) / note (gm), live
  *   - Knob 7 turn      -> swing (0..100)
  *   - Knob 8 turn      -> switch genre (jumps to that genre's first pattern)
@@ -42,6 +44,14 @@ const CC_PAD_LO = 71, CC_PAD_HI = 76;  /* K1..K6 = positional pad/note selectors
 const CC_SWING = 77;                    /* K7 = swing */
 const CC_GENRE = 78;                    /* K8 = genre */
 const SWING_STEP = 5;
+
+/* K8 genre selector is deliberately "geared down": Move's encoders are endless,
+ * so we spend more wheel travel per genre to make the (~24-genre) list less
+ * twitchy. It takes this many detents to advance one genre — at ~24 detents per
+ * physical revolution that's ~8 genres per full turn. Bump it up/down to taste
+ * after feeling it on hardware (higher = coarser, more spins to cross the list). */
+const GENRE_DETENTS_PER_STEP = 3;
+let genreAccum = 0;
 
 const g = {
   count: 1, pattern: 0, steps: 16, name: '', genre: '', swing: 0,
@@ -189,7 +199,7 @@ function draw(ctx) {
 }
 
 globalThis.canvas_overlay = {
-  onOpen(ctx) { g.genres = []; load(ctx, true); },
+  onOpen(ctx) { g.genres = []; genreAccum = 0; load(ctx, true); },
   tick(ctx) { load(ctx, false); },
   draw(ctx) { draw(ctx); return true; },
   onMidi(ctx, payload) {
@@ -198,8 +208,18 @@ globalThis.canvas_overlay = {
     const type = d[0] & 0xF0, b1 = d[1], b2 = d[2];
     if (type !== 0xB0 || b2 === 0) return;   /* encoders: 1..63 = +, 64..127 = - */
     const dir = b2 < 64 ? 1 : -1;
-    if (b1 === CC_JOG)   { cyclePattern(ctx, dir); return; }
-    if (b1 === CC_GENRE) { switchGenre(ctx, dir); return; }
+    if (b1 === CC_JOG) {   /* shift+jog = genre, plain jog = pattern (falls back if host lacks shiftHeld) */
+      const shifted = typeof ctx.shiftHeld === 'function' && ctx.shiftHeld();
+      (shifted ? switchGenre : cyclePattern)(ctx, dir);
+      return;
+    }
+    if (b1 === CC_GENRE) {
+      if (dir * genreAccum < 0) genreAccum = 0;   /* reversing drops stale travel */
+      genreAccum += dir;
+      while (genreAccum >= GENRE_DETENTS_PER_STEP)  { switchGenre(ctx,  1); genreAccum -= GENRE_DETENTS_PER_STEP; }
+      while (genreAccum <= -GENRE_DETENTS_PER_STEP) { switchGenre(ctx, -1); genreAccum += GENRE_DETENTS_PER_STEP; }
+      return;
+    }
     if (b1 === CC_SWING) { setSwing(ctx, dir); return; }
     if (b1 >= CC_PAD_LO && b1 <= CC_PAD_HI) {
       editNote(ctx, usedVoices()[b1 - CC_PAD_LO], dir);   /* positional: K1 -> row 0 */
