@@ -2,7 +2,7 @@
     "id": "beatbank",
     "name": "Beat Bank",
     "abbrev": "BEAT",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "description": "Library of standard drum patterns from editable .beat files — pick a pattern, it prints one bar into Move.",
     "author": "Mission Minnow",
     "api_version": 2,

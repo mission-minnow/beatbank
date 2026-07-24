@@ -45,12 +45,11 @@ const CC_SWING = 77;                    /* K7 = swing */
 const CC_GENRE = 78;                    /* K8 = genre */
 const SWING_STEP = 5;
 
-/* K8 genre selector is deliberately "geared down": Move's encoders are endless,
- * so we spend more wheel travel per genre to make the (~24-genre) list less
- * twitchy. It takes this many detents to advance one genre — at ~24 detents per
- * physical revolution that's ~8 genres per full turn. Bump it up/down to taste
- * after feeling it on hardware (higher = coarser, more spins to cross the list). */
-const GENRE_DETENTS_PER_STEP = 3;
+/* K8 genre selector is deliberately "geared way down": Move's encoders are
+ * endless (~48 detents/rev), so one genre per 24 detents = ~half a physical turn.
+ * Short deliberate moves beat a twitchy flick that skips past the genre you want.
+ * (Matches Groove Bank's K1/K8 gearing — same feel across the Bank family.) */
+const GENRE_DETENTS_PER_STEP = 24;
 let genreAccum = 0;
 
 const g = {
