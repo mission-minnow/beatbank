@@ -24,7 +24,8 @@
                 },
                 "globals": {
                     "name": "Globals",
-                    "params": ["swing", "note_map"],
+                    "params": ["swing", "note_map",
+        { "key": "note_map", "short_name": "Map" }],
                     "knobs": ["swing", "note_map"]
                 }
             }
