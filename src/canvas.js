@@ -90,6 +90,16 @@ function genreIndexOf(p) {
 }
 
 function load(ctx, force) {
+  /* Schwung >= 1.2 hands `draw` and `tick` a ctx with the param accessors stripped
+   * (DRAW_PATH_HOOKS in shadow_ui.js: a getParam round-trip is ~2.8 ms against a
+   * 1.68 ms whole-page render, so reads are banned on the draw path by construction).
+   * tick() calls this function, so reading here threw
+   *   TypeError: ctx.getParam is not a function
+   * on the overlay's first frame -- the host then disabled the canvas for the session
+   * and the screen showed that error instead of the grid. onOpen() and onMidi() still
+   * get the FULL ctx, so the state is primed on open and refreshed on every jog/knob
+   * event: a read-less tick must KEEP it, not refresh it. */
+  if (typeof ctx.getParam !== "function") return;
   const rev = gpi(ctx, 'preview_rev', 0);
   if (force || rev !== g.rev) {
     g.rev = rev;
