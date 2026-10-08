@@ -13,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 MOVE_HOST="${1:-move.local}"
-MOVE_USER="root"
+MOVE_USER="${MOVE_USER:-ableton}"
 MOVE_MODULES_DIR="/data/UserData/schwung/modules"
 MODULE_CATEGORY="midi_fx"
 MODULE_ID="beatbank"
@@ -37,12 +37,12 @@ scp "$DSO"                  "${DEST}/dsp.so.new"
 ssh "${MOVE_USER}@${MOVE_HOST}" "mv -f ${MODDIR}/dsp.so.new ${MODDIR}/dsp.so"
 
 scp src/module.json        "${DEST}/module.json"
-scp src/canvas.js          "${DEST}/canvas.js"
+scp src/ui_chain.js        "${DEST}/ui_chain.js"
 scp src/help.json          "${DEST}/help.json"
 scp src/patterns/*.beat    "${DEST}/patterns/"
 
-# Remove stale UI files from earlier installs (native menu + canvas.js only).
-ssh "${MOVE_USER}@${MOVE_HOST}" "rm -f ${MODDIR}/ui.js ${MODDIR}/ui_chain.js ${MODDIR}/ui_core.mjs" || true
+# Remove stale UI files from earlier installs.
+ssh "${MOVE_USER}@${MOVE_HOST}" "rm -f ${MODDIR}/ui.js ${MODDIR}/canvas.js ${MODDIR}/ui_core.mjs" || true
 
 echo ""
 echo "✓ Installed to ${MOVE_MODULES_DIR}/${MODULE_CATEGORY}/${MODULE_ID}/"

@@ -13,22 +13,7 @@
         "chainable": true,
         "component_type": "midi_fx",
         "pre_capable": true,
-        "ui_hierarchy": {
-            "levels": {
-                "root": {
-                    "name": "Beat Bank",
-                    "params": [
-                        { "key": "view", "name": "Pattern", "type": "canvas", "canvas_script": "canvas.js", "show_value": false, "show_footer": false },
-                        { "level": "globals", "label": "Globals" }
-                    ]
-                },
-                "globals": {
-                    "name": "Globals",
-                    "params": ["swing", "note_map"],
-                    "knobs": ["swing", "note_map"]
-                }
-            }
-        }
+        "ui_chain": "ui_chain.js"
     },
     "chain_params": [
         { "key": "pattern", "name": "Pattern", "type": "int", "min": 0, "max": 599, "default": 0, "step": 1 },

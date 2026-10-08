@@ -40,10 +40,10 @@ Bank sends by default.
 3. **Sound Generator → Mr. Drums.** Load a drum kit (a built-in kit, an
    `.ablpreset`, or your own samples).
 4. **MIDI FX → Beat Bank.**
-5. Open Beat Bank → **Pattern**, then **press Play** on the Move. You'll hear the
+5. Open Beat Bank, then **press Play** on the Move. You'll hear the
    beat playing through your kit. 🎉
-6. **Turn the jog** to audition patterns in the current genre; **Knob 8** hops to
-   another genre (the current genre shows in the footer as `K8: …`).
+6. **Turn the jog** to audition patterns in the current genre, or **click** to
+   open Schwung's scrollable pattern list. **Knob 8** hops to another genre.
 7. **Turn Knobs 1–6** to move each drum voice onto a different pad in your kit —
    live, while the loop plays. No trips into the sampler.
 8. **Knob 7** adds swing. When it sounds right, **record it** with the Quantized
@@ -61,9 +61,10 @@ a kit. This uses Beat Bank's **Schw+Move** (Pre) mode, which injects the beat in
 the track just like live playing.
 
 1. In the slot's **MIDI FX** settings, set Beat Bank to **Schw+Move** (Pre).
-2. Aim it at the track you want by setting the slot's **Recv Ch** to that track's
-   channel (Move's default is Track *N* ↔ channel *N*), and make sure that
-   **track's MIDI In is On**.
+2. Set the slot's **Recv Ch** to a specific channel (for example, **Ch 1**),
+   then set the target Move track's **MIDI In** to that same channel. Move's
+   **Auto** input follows the selected track for channels no track has reserved,
+   so a fixed channel keeps the beat on the intended instrument.
 3. **Press Play.** The beat plays *through the track's own kit*, so you hear
    exactly what you'll capture — **this is your audition; nothing is recorded until
    you arm.**
@@ -73,13 +74,14 @@ the track just like live playing.
 
 ### 🔇 Play back cleanly (silence Beat Bank)
 
-Beat Bank only reaches the track **through that track's MIDI In**, so one switch
-silences it: **set the track's MIDI In to Off.** Now Play plays only your recorded
-clips — Beat Bank injects nothing on top. Flip MIDI In back **On** whenever you
-want to print more beats.
+After recording, **bypass Beat Bank** or switch its MIDI FX mode from
+**Schw+Move** to **Schw**. The recorded MIDI clip then plays without Beat Bank
+injecting a second copy. Turning the target track's MIDI In off alone may send
+the unreserved channel to another track whose input is set to Auto.
 
-> **Re-record a pad:** delete the pad's clip, set MIDI In **On**, pick a beat, and
-> record again. The pad itself is the audition — print it, listen, keep or redo.
+> **Re-record a pad:** clear the pad's clip, set Beat Bank back to **Schw+Move**,
+> pick a beat, and record again. The pad itself is the audition — print it,
+> listen, keep or redo.
 
 > ℹ️ Needs a Schwung build with **Schw+Move / Pre-mode inject**. If the MIDI FX
 > mode only shows **Schw** (no **Schw+Move**), update Schwung first.
@@ -88,26 +90,27 @@ want to print more beats.
 
 ## 🎛 The Pattern view
 
-A fullscreen grid. Genre-first browsing on the jog, live sound design on the knobs.
+A fullscreen grid. Four knob values sit above the pattern and four below it.
+The middle half of the display shows the beat. Touch a pad or genre knob to
+open a mini-font choice list; turn any knob or the jog, then lift your finger
+to pick. Click also picks, and Back cancels.
 
 ```
 ┌──────────────────────────────────────┐
+│ KCK p1  SNR p3   CH p7   OH p11       │
 │ Classic House                   1/19  │
-│ 1 KCK p1  x...x...x...x...            │
-│ 2 CH  p7  x.x.x.x.x.x.x.x.            │
-│ 3 OH  p11 ..x...x...x...x.            │
-│ 4 CLP p4  ....x.......x...            │
-│                                       │
-│ sw:0          K8: HOUSE              │
+│ x...x...x...x...                     │
+│ ....x.......x...                     │
+│ x.x.x.x.x.x.x.x.                     │
+│ ..x...x...x...x.                     │
+│ CLP p4  RIM p5   SWNG 0%  GENR HOUSE │
 └──────────────────────────────────────┘
 ```
 
-<sub>Row = knob · voice · pad · the 16-step grid (`x` hit · `.` rest). Turn Knob 3
-here and the closed-hat jumps to a different pad in your kit, live.</sub>
+<sub>Pattern rows correspond to the voice knobs in order. Turn Knob 3 and the
+closed-hat jumps to a different pad in your kit, live.</sub>
 
-Each row shows its **knob number**, the **voice**, and the **pad** (`p1`…`p16`) it
-drives — so you can see at a glance which knob re-points which drum, and match a
-loaded kit without guessing.
+Each voice knob shows its short name and the pad (`p1`…`p16`) it drives.
 
 ---
 
@@ -119,7 +122,10 @@ loaded kit without guessing.
 | **Knobs 1–6**      | Move each voice (row 1–6) to a different **pad / note** — live     |
 | **Knob 7**         | Swing (0–100)                                                     |
 | **Knob 8**         | Switch genre (shown in the footer as `K8: …`)                     |
-| **Jog-click / Back** | Exit the Pattern view                                           |
+| **Jog-click**       | Open the pattern list; click again to select                     |
+| **Touch K1–6 or K8** | Open that knob's scrollable choice list; release to pick          |
+| **Shift + jog-click** | Open the Note Map choice list                                   |
+| **Back**            | Cancel the pattern list, or exit the Pattern view                |
 
 **Positional pads.** Knob 1 always edits the top row, Knob 2 the next, and so on.
 Voices appear in a fixed order (kick, snare, hats, then extras), so a voice keeps
@@ -130,8 +136,7 @@ resets them to the map defaults).
 **Tempo & feel.** Beat Bank follows Move's transport (silent when stopped) and
 plays straight. Swing is the only groove control — it's deterministic and works
 on any synth, since Beat Bank bypasses Move's sequencer (so Move's Groove doesn't
-apply). Genre and pattern selection live under **Menu → Pattern**; swing and note
-map are also under **Menu → Globals**.
+apply). Shift + jog-click opens the Note Map list.
 
 ---
 
